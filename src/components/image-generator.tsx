@@ -659,27 +659,25 @@ export default function ImageGenerator() {
                     <Label htmlFor="prompt" className="text-sm font-medium">
                       {mode === 'generate' ? '提示词描述 *' : '修改要求 *'}
                     </Label>
-                    {mode === 'generate' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleOptimizePrompt}
-                        disabled={optimizing || !prompt.trim()}
-                        className="h-8 text-xs shadow-sm"
-                      >
-                        {optimizing ? (
-                          <>
-                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                            优化中
-                          </>
-                        ) : (
-                          <>
-                            <Wand2 className="mr-1.5 h-3.5 w-3.5" />
-                            优化提示词
-                          </>
-                        )}
-                      </Button>
-                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOptimizePrompt}
+                      disabled={optimizing || !prompt.trim()}
+                      className="h-8 text-xs shadow-sm"
+                    >
+                      {optimizing ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          优化中
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="mr-1.5 h-3.5 w-3.5" />
+                          优化提示词
+                        </>
+                      )}
+                    </Button>
                   </div>
                   <Textarea
                     id="prompt"

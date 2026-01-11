@@ -82,7 +82,8 @@ async function processTask(
   useGoogleSearch: boolean,
   referenceImages: Array<{mimeType: string; data: string}>,
   apiKey: string,
-  apiUrl: string
+  apiUrl: string,
+  model: string
 ) {
   try {
     taskStore.updateTask(taskId, { status: 'processing' });
@@ -96,8 +97,9 @@ async function processTask(
     }
 
     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+    const selectedModel = model || 'gemini-3-pro-image-preview';
     // 使用流式端点，避免代理超时
-    const endpoint = `${baseUrl}/v1beta/models/gemini-3-pro-image-preview:streamGenerateContent?alt=sse`;
+    const endpoint = `${baseUrl}/v1beta/models/${selectedModel}:streamGenerateContent?alt=sse`;
 
     const parts: Array<{text?: string; inline_data?: {mime_type: string; data: string}}> = [
       { text: prompt }
@@ -233,6 +235,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { 
       prompt, 
+      model = 'gemini-3-pro-image-preview',
       aspectRatio = '1:1',
       imageSize = '1K',
       useGoogleSearch = false,
@@ -254,7 +257,7 @@ export async function POST(request: NextRequest) {
     });
 
     // 启动异步任务，不等待完成
-    processTask(taskId, prompt, aspectRatio, imageSize, useGoogleSearch, referenceImages, apiKey, apiUrl)
+    processTask(taskId, prompt, aspectRatio, imageSize, useGoogleSearch, referenceImages, apiKey, apiUrl, model)
       .catch((err) => {
         console.error('Background task error:', err);
         taskStore.updateTask(taskId, {

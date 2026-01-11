@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt } = body;
+    const { prompt, model } = body as { prompt?: string; model?: string };
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
@@ -24,17 +24,21 @@ export async function POST(request: NextRequest) {
     }
 
     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-    const endpoint = `${baseUrl}/v1beta/models/gemini-2.5-flash-lite:generateContent`;
+    const selectedModel = model && typeof model === 'string' ? model : 'gemini-2.5-flash-lite';
+    const endpoint = `${baseUrl}/v1beta/models/${selectedModel}:generateContent`;
 
-    const systemPrompt = `你是一个专业的 AI 图像生成提示词优化专家。用户会给你一段简单的图像描述，你需要将其优化为更详细、更专业的提示词，以便 AI 图像生成模型能够生成更高质量的图像。
+    const systemPrompt = `你是专业的图像生成提示词优化助手。用户会给出简短描述，你需要依据官方提示指南将其改写为更清晰、更具可执行细节的提示词。
 
-优化规则：
-1. 保持用户原始意图不变
-2. 添加更多细节描述（光线、色彩、构图、风格等）
-3. 使用专业的艺术术语
-4. 保持简洁，不要过于冗长
-5. 直接输出优化后的提示词，不要有任何解释或前缀
-6. 必须使用简体中文输出，无论用户输入什么语言
+优化规则（遵循官方提示指南）：
+1. 保持用户原始意图不变，避免新增不相关主体
+2. 结构要清晰：主题（主体）+ 背景/环境 + 风格
+3. 使用描述性语言补足细节：光线、色彩、构图、氛围、材质、视角
+4. 若用户想要“照片风格”，用“一张…的照片”并可补充镜头距离/机位/光线等摄影修饰
+5. 若用户提到风格/艺术流派/艺术家，明确“...风格的...”或“...风格”
+6. 若涉及人物面部细节，可加入“肖像/portrait”等提示以强调面部细节
+7. 若用户要求图片中包含文字：将文字限制为不超过 25 个字符，尽量用 1-3 个短语；可指定大致位置、字体风格与大小，但不要承诺精确字体复刻
+8. 保持简洁，不要过长；直接输出优化后的提示词，不要解释或添加前缀
+9. 必须使用简体中文输出
 
 用户输入：${prompt}
 

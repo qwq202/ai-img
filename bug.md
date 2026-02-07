@@ -1,0 +1,53 @@
+# Bug 记录
+
+> 每条记录请按以下模板追加。
+
+## YYYY-MM-DD - 简短标题
+- 位置：
+- 现象：
+- 原因：
+- 修复：
+- 验证：
+
+## 2026-02-07 - 提示词优化模型误包含图片模型
+- 位置：`src/components/image-generator.tsx` 设置弹窗 `提示词优化模型` 下拉框
+- 现象：提示词优化模型列表中出现了图片生成模型，用户可误选导致优化请求失败或效果异常。
+- 原因：提示词优化下拉复用了 `availableModels` 全量模型列表，未区分文本模型与图片模型。
+- 修复：新增优化模型筛选逻辑（排除名称包含 `image` 的模型），并在当前已选模型不合法时自动回退到首个可用优化模型。
+- 验证：打开设置弹窗，确认“提示词优化模型”下拉不再显示 `gemini-3-pro-image-preview`、`gemini-2.5-flash-image` 等图片模型；触发提示词优化接口返回正常。
+
+## 2026-02-07 - 图像模型下拉误包含文本模型
+- 位置：`src/components/image-generator.tsx` 生成模型与编辑模型下拉框
+- 现象：图像生成/编辑模型列表中出现文本模型，用户可误选导致接口使用到不支持图像的模型。
+- 原因：生成与编辑模型下拉同样复用了 `availableModels` 全量列表，未按图像能力筛选。
+- 修复：新增图像模型筛选逻辑（仅保留名称包含 `image` 的模型），并在当前已选模型不合法时自动回退到首个可用图像模型。
+- 验证：在页面中检查“生成模型”“编辑模型”下拉，不再显示 `gemini-2.5-flash-lite` 等文本模型；发起生成/编辑请求可正常返回结果。
+
+## 2026-02-07 - 支持通过 URL 参数注入 API 设置
+- 位置：`src/components/image-generator.tsx` 初始化配置读取逻辑
+- 现象：无法通过分享链接一次性注入 `Gemini API Key` 和 `API URL`，新设备打开后仍需手动填写设置。
+- 原因：页面仅从 `localStorage` 读取配置，未解析 URL 查询参数中的 `settings`。
+- 修复：在首屏挂载后增加 `?settings=` 解析（支持 JSON 与 URL 编码 JSON），将 `key/url/optimizeModel` 写入状态与 `localStorage`，并在读取后从地址栏移除 `settings` 参数。
+- 验证：访问 `/?settings={...}`（URL 编码 JSON），页面应自动填充并保存 Key/URL，刷新后仍可读取，地址栏不再保留 `settings`。
+
+## 2026-02-07 - 手动保存设置缺少成功/失败反馈
+- 位置：`src/components/image-generator.tsx` 设置弹窗保存逻辑
+- 现象：用户点击“保存设置”后缺少明确成功/失败提示，难以判断是否已保存。
+- 原因：保存流程未提供专门的状态反馈，仅在输入为空时写入全局错误。
+- 修复：新增设置反馈状态，保存时显示成功/失败提示；补充 URL 格式校验和本地存储异常捕获。
+- 验证：在设置弹窗输入有效 key/url 点击保存，显示“设置保存成功”；输入非法 URL 或留空时显示对应失败提示。
+
+## 2026-02-07 - 设置按钮点击触发未定义函数
+- 位置：`src/components/image-generator.tsx` 顶部“设置”按钮 `onClick`
+- 现象：点击“设置”立即报错 `ReferenceError: setSettingsFeedback is not defined`，页面交互中断。
+- 原因：移除 `settingsFeedback` 状态后，按钮点击逻辑仍保留 `setSettingsFeedback(null)` 的残留调用。
+- 修复：删除残留调用，按钮仅负责打开设置弹窗；同步回归检查设置弹窗打开流程。
+- 验证：点击“设置”可正常打开弹窗，无控制台运行时错误。
+
+## 2026-02-07 - edit 后缀模型可被误用于生成
+- 位置：`src/lib/gemini-models.ts`, `src/components/image-generator.tsx`, `src/app/api/generate/route.ts`
+- 现象：名称包含 `/edit` 或 `-edit` 的模型会出现在生成模型列表中，用户可误选后发起生成请求。
+- 原因：模型能力推导未区分 edit-only 模型，默认将图像模型同时标记为可生成与可编辑。
+- 修复：将 edit 后缀模型标记为 `supportsGenerate=false, supportsEdit=true`；前端生成/编辑下拉按能力分流；后端生成接口增加 `supportsGenerate` 硬校验。
+- 验证：`fal-ai/nano-banana/edit` 仅出现在编辑模型列表，不出现在生成模型列表；若绕过前端调用生成接口会返回 `MODEL_CAPABILITY_MISMATCH`。
+

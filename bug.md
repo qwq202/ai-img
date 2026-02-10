@@ -51,3 +51,17 @@
 - 修复：将 edit 后缀模型标记为 `supportsGenerate=false, supportsEdit=true`；前端生成/编辑下拉按能力分流；后端生成接口增加 `supportsGenerate` 硬校验。
 - 验证：`fal-ai/nano-banana/edit` 仅出现在编辑模型列表，不出现在生成模型列表；若绕过前端调用生成接口会返回 `MODEL_CAPABILITY_MISMATCH`。
 
+
+## 2026-02-07 - 上游 503 错误未友好化直接暴露给用户
+- 位置：`src/app/api/generate/route.ts` (`fetchAndReadWithRetry` / `processTask`)
+- 现象：当上游返回 `503 No capacity available` 时，任务失败信息直接显示原始英文错误与整段响应内容，用户难以理解。
+- 原因：后端仅抛出通用 `Error` 并把 `error.message` 原样写入任务状态，未做状态码与上游错误语义映射。
+- 修复：新增 `UpstreamApiError` 与 `toFriendlyTaskError`；将 `503/504/502/429/鉴权失败` 等转换为中文友好提示；将 `503` 等暂时性错误纳入重试条件。
+- 验证：模拟上游返回 `503` 后，前端显示“服务端暂时不可用，请稍后重试”，不再暴露原始报文。
+
+## 2026-02-07 - 历史记录写入 localStorage 超配额导致运行时异常
+- 位置：`src/components/image-generator.tsx` 历史/回收站持久化逻辑
+- 现象：生成多张图片后刷新页面，报错 `QuotaExceededError`，历史无法继续保存。
+- 原因：历史和回收站以 base64 图片形式写入 `localStorage`，容量上限较小（通常几 MB），很快超限。
+- 修复：将历史/回收站存储迁移到 `IndexedDB`；启动时优先读取 `IndexedDB`，并兼容迁移旧 `localStorage` 数据；后续持久化仅写入 `IndexedDB`。
+- 验证：批量生成与刷新后不再出现 `QuotaExceededError`；历史和回收站数据可正常保留。

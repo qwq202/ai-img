@@ -7,11 +7,71 @@ export const maxDuration = 300;
 
 type ReferenceImage = { mimeType: string; data: string };
 
+class UpstreamApiError extends Error {
+  status: number;
+  rawBody: string;
+  upstreamMessage?: string;
+  upstreamCode?: string | number;
+
+  constructor(status: number, rawBody: string, upstreamMessage?: string, upstreamCode?: string | number) {
+    super(`API error ${status}: ${rawBody}`);
+    this.name = 'UpstreamApiError';
+    this.status = status;
+    this.rawBody = rawBody;
+    this.upstreamMessage = upstreamMessage;
+    this.upstreamCode = upstreamCode;
+  }
+}
+
 function jsonError(status: number, code: string, error: string, details?: unknown) {
   return NextResponse.json(
     { code, error, details },
     { status }
   );
+}
+
+function toFriendlyTaskError(error: unknown): string {
+  if (error instanceof UpstreamApiError) {
+    const upstreamMessage = (error.upstreamMessage || '').toLowerCase();
+
+    if (upstreamMessage.includes('auth_unavailable') || upstreamMessage.includes('no auth available')) {
+      return '上游鉴权服务暂不可用，请稍后重试';
+    }
+    if (error.status === 503 || upstreamMessage.includes('no capacity available')) {
+      return '服务端暂时不可用，请稍后重试';
+    }
+    if (error.status === 504 || upstreamMessage.includes('timeout')) {
+      return '服务端响应超时，请稍后重试';
+    }
+    if (error.status === 502) {
+      return '服务连接异常，请稍后重试';
+    }
+    if (error.status === 429) {
+      return '请求过于频繁，请稍后再试';
+    }
+    if (error.status === 401 || error.status === 403) {
+      return '鉴权失败，请检查 API Key 是否有效';
+    }
+    if (error.status >= 500) {
+      return '服务端发生错误，请稍后重试';
+    }
+    if (upstreamMessage.includes('provided image is not valid')) {
+      return '上传图片无效，请更换图片后重试';
+    }
+    return error.upstreamMessage || '请求失败，请稍后重试';
+  }
+
+  if (error instanceof Error) {
+    const normalized = error.message.toLowerCase();
+    if (normalized.includes('aborterror') || normalized.includes('timeout') || normalized.includes('timed out')) {
+      return '请求超时，请稍后重试';
+    }
+    if (normalized.includes('econnreset') || normalized.includes('socketerror') || normalized.includes('failed to fetch')) {
+      return '网络连接异常，请稍后重试';
+    }
+  }
+
+  return '请求失败，请稍后重试';
 }
 
 async function fetchWithTimeout(
@@ -51,7 +111,20 @@ async function fetchAndReadWithRetry(
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API error ${response.status}: ${errorText}`);
+        let upstreamMessage: string | undefined;
+        let upstreamCode: string | number | undefined;
+
+        try {
+          const parsed = JSON.parse(errorText) as {
+            error?: { message?: string; code?: string | number };
+          };
+          upstreamMessage = parsed.error?.message;
+          upstreamCode = parsed.error?.code;
+        } catch {
+          // ignore parse error, keep raw response text
+        }
+
+        throw new UpstreamApiError(response.status, errorText, upstreamMessage, upstreamCode);
       }
 
       const text = await response.text();
@@ -60,12 +133,16 @@ async function fetchAndReadWithRetry(
     } catch (error) {
       lastError = error as Error;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const isRetryable =
+      const isRetryableStatus =
+        error instanceof UpstreamApiError &&
+        [429, 500, 502, 503, 504].includes(error.status);
+      const isRetryableNetwork =
         errorMessage.includes('terminated') ||
         errorMessage.includes('SocketError') ||
         errorMessage.includes('other side closed') ||
         errorMessage.includes('ECONNRESET') ||
         errorMessage.includes('AbortError');
+      const isRetryable = isRetryableStatus || isRetryableNetwork;
 
       console.log(`[Fetch] Attempt ${attempt + 1} failed: ${errorMessage}`);
 
@@ -229,11 +306,17 @@ async function processTask(
       }
     });
   } catch (error) {
-    console.error('Error processing task:', error);
+    if (error instanceof UpstreamApiError) {
+      console.warn(
+        `[Task ${taskId}] Upstream error: status=${error.status}, code=${String(error.upstreamCode || '')}, message=${error.upstreamMessage || ''}`
+      );
+    } else {
+      console.error('Error processing task:', error);
+    }
     taskStore.updateTask(taskId, {
       status: 'failed',
       phase: 'failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: toFriendlyTaskError(error)
     });
   }
 }

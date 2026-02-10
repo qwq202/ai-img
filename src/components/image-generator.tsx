@@ -94,6 +94,11 @@ interface ApiErrorLike {
   }
 }
 
+interface ModelsApiResponse extends ApiErrorLike {
+  imageModels?: Array<Partial<ImageModelOption> & { id?: string }>
+  promptModels?: unknown[]
+}
+
 type WorkspacePage = 'studio' | 'history' | 'trash'
 type WorkMode = 'generate' | 'edit'
 
@@ -412,7 +417,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
     try {
       const response = await fetch('/api/models', { headers })
-      const data = (await response.json()) as ApiErrorLike
+      const data = (await response.json()) as ModelsApiResponse
 
       if (!response.ok) {
         addDebugLog('models_fetch_failed', { status: response.status, error: data?.error })
@@ -433,7 +438,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         : []
 
       const nextPromptModels = Array.isArray(data.promptModels)
-        ? data.promptModels.filter((item: unknown) => typeof item === 'string' && !!item)
+        ? data.promptModels.filter((item: unknown): item is string => typeof item === 'string' && !!item)
         : []
 
       setImageModels(nextImageModels)
@@ -491,7 +496,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           'x-gemini-api-url': trimmedUrl,
         },
       })
-      const data = (await response.json().catch(() => ({}))) as ApiErrorLike
+      const data = (await response.json().catch(() => ({}))) as ModelsApiResponse
 
       if (!response.ok) {
         const message = friendlyMessageFromResponse(response.status, data, '连接失败，请稍后重试')

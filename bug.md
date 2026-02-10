@@ -65,3 +65,10 @@
 - 原因：历史和回收站以 base64 图片形式写入 `localStorage`，容量上限较小（通常几 MB），很快超限。
 - 修复：将历史/回收站存储迁移到 `IndexedDB`；启动时优先读取 `IndexedDB`，并兼容迁移旧 `localStorage` 数据；后续持久化仅写入 `IndexedDB`。
 - 验证：批量生成与刷新后不再出现 `QuotaExceededError`；历史和回收站数据可正常保留。
+
+## 2026-02-10 - 模型加载响应类型过窄导致生产构建失败
+- 位置：`src/components/image-generator.tsx` `loadModels`
+- 现象：执行 `next build` 时 TypeScript 报错：`Property 'imageModels' does not exist on type 'ApiErrorLike'`，生产构建中断。
+- 原因：`/api/models` 成功响应被声明为 `ApiErrorLike`（仅错误字段），访问 `imageModels`/`promptModels` 缺少类型定义。
+- 修复：新增 `ModelsApiResponse` 类型（继承 `ApiErrorLike` 并补充 `imageModels`、`promptModels`），并将 `loadModels` 的响应解析改为该类型。
+- 验证：重新执行 `pnpm exec next build --webpack`，构建与类型检查通过。

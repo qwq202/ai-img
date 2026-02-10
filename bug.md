@@ -72,3 +72,17 @@
 - 原因：`/api/models` 成功响应被声明为 `ApiErrorLike`（仅错误字段），访问 `imageModels`/`promptModels` 缺少类型定义。
 - 修复：新增 `ModelsApiResponse` 类型（继承 `ApiErrorLike` 并补充 `imageModels`、`promptModels`），并将 `loadModels` 的响应解析改为该类型。
 - 验证：重新执行 `pnpm exec next build --webpack`，构建与类型检查通过。
+
+## 2026-02-10 - 任务状态存储未清理终态记录导致服务端内存增长
+- 位置：`src/lib/task-store.ts` `createTask` / `updateTask`
+- 现象：任务完成或失败后仍长期保留在内存 `Map` 中，持续运行后进程内存占用不断增长。
+- 原因：仅对 `pending` 任务设置过期清理，`completed`/`failed` 任务没有回收策略。
+- 修复：引入统一的定时清理调度；创建任务时设置 pending TTL；任务进入终态时重置为终态 TTL；删除任务时同步清理定时器。
+- 验证：连续触发任务并等待 TTL 后，终态任务从内存存储中自动移除，不再无限累积。
+
+## 2026-02-10 - 本地图片预览 URL 未释放导致页面内存泄漏
+- 位置：`src/components/image-generator.tsx` `toRefImage` / `removeImage` / 组件卸载清理
+- 现象：频繁上传/删除参考图后，浏览器内存持续升高，长时间使用会出现卡顿。
+- 原因：`URL.createObjectURL` 生成的 `blob:` 预览地址在删除图片或卸载组件时未调用 `URL.revokeObjectURL` 释放。
+- 修复：新增预览 URL 释放逻辑：删除单张图片时释放对应 URL，并在组件卸载时统一释放剩余预览 URL。
+- 验证：重复上传和删除图片后，浏览器内存曲线稳定，不再持续增长。

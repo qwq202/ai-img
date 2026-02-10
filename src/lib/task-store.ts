@@ -16,8 +16,26 @@ export interface Task {
   error?: string
 }
 
+const PENDING_TASK_TTL_MS = 10 * 60 * 1000
+const TERMINAL_TASK_TTL_MS = 30 * 60 * 1000
+
 class TaskStore {
   private tasks: Map<string, Task> = new Map()
+  private cleanupTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+
+  private scheduleCleanup(taskId: string, ttlMs: number): void {
+    const existingTimer = this.cleanupTimers.get(taskId)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
+
+    const timer = setTimeout(() => {
+      this.tasks.delete(taskId)
+      this.cleanupTimers.delete(taskId)
+    }, ttlMs)
+
+    this.cleanupTimers.set(taskId, timer)
+  }
 
   createTask(params: {
     prompt: string
@@ -25,7 +43,7 @@ class TaskStore {
     imageSize: string
     useGoogleSearch: boolean
   }): string {
-    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const taskId = `task_${crypto.randomUUID()}`
     const task: Task = {
       id: taskId,
       status: 'pending',
@@ -35,16 +53,9 @@ class TaskStore {
       updatedAt: Date.now(),
     }
     this.tasks.set(taskId, task)
-    
-    setTimeout(() => {
-      if (this.tasks.has(taskId)) {
-        const task = this.tasks.get(taskId)
-        if (task && task.status === 'pending') {
-          this.tasks.delete(taskId)
-        }
-      }
-    }, 10 * 60 * 1000)
-    
+
+    this.scheduleCleanup(taskId, PENDING_TASK_TTL_MS)
+
     return taskId
   }
 
@@ -55,21 +66,30 @@ class TaskStore {
   updateTask(taskId: string, updates: Partial<Task>): void {
     const task = this.tasks.get(taskId)
     if (task) {
-      this.tasks.set(taskId, {
+      const nextTask = {
         ...task,
         ...updates,
         updatedAt: Date.now(),
-      })
+      }
+      this.tasks.set(taskId, nextTask)
+
+      if (nextTask.status === 'completed' || nextTask.status === 'failed') {
+        this.scheduleCleanup(taskId, TERMINAL_TASK_TTL_MS)
+      }
     }
   }
 
   deleteTask(taskId: string): void {
+    const existingTimer = this.cleanupTimers.get(taskId)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+      this.cleanupTimers.delete(taskId)
+    }
     this.tasks.delete(taskId)
   }
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __taskStore: TaskStore | undefined
 }
 

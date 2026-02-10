@@ -18,9 +18,7 @@ import {
   Trash2,
   Undo2,
   RotateCcw,
-  Home,
   RefreshCw,
-  ChevronRight,
   AlertCircle,
   Maximize2,
   Menu,
@@ -29,7 +27,7 @@ import {
 
 import { cn } from '@/lib/utils'
 import { idbGet, idbSet } from '@/lib/indexeddb'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -64,12 +62,6 @@ interface ImageModelOption {
 interface ModelsCachePayload {
   imageModels: ImageModelOption[]
   promptModels: string[]
-}
-
-interface DebugLogEntry {
-  ts: string
-  event: string
-  data?: unknown
 }
 
 interface HistoryItem {
@@ -175,7 +167,6 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   const [historyLimit, setHistoryLimit] = useState(30)
 
   const [debugEnabled, setDebugEnabled] = useState(false)
-  const [debugLogs, setDebugLogs] = useState<DebugLogEntry[]>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const [imageLoading, setImageLoading] = useState(true)
@@ -186,14 +177,20 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     }
   }, [generatedImage])
 
+  const revokePreviewUrl = (url?: string) => {
+    if (url?.startsWith('blob:')) {
+      URL.revokeObjectURL(url)
+    }
+  }
+
   // Ctrl/Cmd + Enter to submit
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         if (mode === 'generate' && prompt.trim() && generateModel && !loading) {
-          handleGenerate()
+          handleGenerateRef.current()
         } else if (mode === 'edit' && prompt.trim() && editModel && editImages.length > 0 && !loading) {
-          handleEdit()
+          handleEditRef.current()
         }
       }
     }
@@ -203,6 +200,28 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
 
   const taskStatusSnapshotRef = useRef('')
+  const handleGenerateRef = useRef<() => void>(() => {})
+  const handleEditRef = useRef<() => void>(() => {})
+  const loadModelsRef = useRef<(params?: { silent?: boolean }) => Promise<void>>(async () => {})
+  const restoreModelsFromCacheRef = useRef<(rawUrl: string) => void>(() => {})
+  const addImagesRef = useRef<(files: File[], target: WorkMode) => Promise<void>>(async () => {})
+  const referenceImagesRef = useRef<ReferenceImage[]>([])
+  const editImagesRef = useRef<ReferenceImage[]>([])
+
+  useEffect(() => {
+    referenceImagesRef.current = referenceImages
+  }, [referenceImages])
+
+  useEffect(() => {
+    editImagesRef.current = editImages
+  }, [editImages])
+
+  useEffect(() => {
+    return () => {
+      referenceImagesRef.current.forEach((item) => revokePreviewUrl(item.preview))
+      editImagesRef.current.forEach((item) => revokePreviewUrl(item.preview))
+    }
+  }, [])
 
   useEffect(() => {
     if (notice) {
@@ -241,7 +260,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
   const addDebugLog = (event: string, data?: unknown) => {
     if (!debugEnabled) return
-    setDebugLogs((prev) => [...prev.slice(-299), { ts: new Date().toISOString(), event, data }])
+    console.debug('[debug]', { ts: new Date().toISOString(), event, data })
   }
 
   const friendlyMessageFromUnknown = (error: unknown, fallback = '请求失败，请稍后重试') => {
@@ -302,16 +321,6 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   }
 
   const getModelsCacheKey = (rawUrl: string) => `gemini_models_cache_${encodeURIComponent(rawUrl.trim().toLowerCase())}`
-
-  const modelCapabilityTags = (cap: ModelCapabilities) => {
-    const tags = [`Max ${cap.maxReferenceImages}`]
-    if (!cap.supportsGenerate && cap.supportsEdit) tags.push('Edit Only')
-    if (cap.forcedImageSize) tags.push(cap.forcedImageSize)
-    if (cap.supportsAspectRatio) tags.push('AR')
-    if (cap.supportsImageSize) tags.push('Res')
-    if (cap.supportsSearchGrounding) tags.push('Search')
-    return tags
-  }
 
   const mapTaskPhaseToMessage = (phase?: string) => {
     if (phase === 'queued') return '排队中...'
@@ -407,6 +416,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       // ignore broken cache
     }
   }
+  restoreModelsFromCacheRef.current = restoreModelsFromCache
 
   const loadModels = async ({ silent = false }: { silent?: boolean } = {}) => {
     const headers = buildApiHeaders()
@@ -467,6 +477,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       if (!silent) setModelsLoading(false)
     }
   }
+  loadModelsRef.current = loadModels
 
   const handleTestConnection = async () => {
     const trimmedKey = apiKey.trim()
@@ -616,13 +627,30 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     setNotice(`已添加 ${parsed.length} 张`)
     setError('')
   }
+  addImagesRef.current = addImages
 
   const removeImage = (target: WorkMode, id: string) => {
     if (target === 'generate') {
-      setReferenceImages((prev) => prev.filter((item) => item.id !== id))
+      setReferenceImages((prev) => {
+        const next = prev.filter((item) => item.id !== id)
+        prev.forEach((item) => {
+          if (!next.some((nextItem) => nextItem.id === item.id)) {
+            revokePreviewUrl(item.preview)
+          }
+        })
+        return next
+      })
       return
     }
-    setEditImages((prev) => prev.filter((item) => item.id !== id))
+    setEditImages((prev) => {
+      const next = prev.filter((item) => item.id !== id)
+      prev.forEach((item) => {
+        if (!next.some((nextItem) => nextItem.id === item.id)) {
+          revokePreviewUrl(item.preview)
+        }
+      })
+      return next
+    })
   }
 
   const pollTaskStatus = async (taskId: string) => {
@@ -929,21 +957,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       setLoading(false)
     }
   }
-
-  const handleReset = () => {
-    setPrompt('')
-    setGeneratedImage(null)
-    setGeneratedText('')
-    setError('')
-    setNotice('')
-    setLoadingMessage('等待任务...')
-    setAspectRatio('auto')
-    setImageSize('1K')
-    setUseGoogleSearch(false)
-    setReferenceImages([])
-    setEditImages([])
-    setBatchResults([])
-  }
+  handleGenerateRef.current = handleGenerate
+  handleEditRef.current = handleEdit
 
   const handleClearCreativeParams = () => {
     setGenerateModel('')
@@ -962,36 +977,6 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
     setError('')
     setNotice('创作参数已清空并恢复默认值')
-  }
-
-  const handleCopyDebugReport = async () => {
-    try {
-      const report = {
-        generatedAt: new Date().toISOString(),
-        apiUrl,
-        workspacePage,
-        mode,
-        selectedModels: { generateModel, editModel, optimizeModel },
-        modelCounts: { imageModels: imageModels.length, promptModels: promptModels.length },
-        runtime: {
-          loading,
-          loadingMessage,
-          error,
-          notice,
-          referenceImages: referenceImages.length,
-          editImages: editImages.length,
-          historyItems: historyItems.length,
-          trashItems: trashItems.length,
-          historyLimit,
-        },
-        logs: debugLogs,
-      }
-      await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
-      setNotice('调试信息已复制')
-      addDebugLog('debug_report_copied', { logCount: debugLogs.length })
-    } catch {
-      setError('复制失败')
-    }
   }
 
   useEffect(() => {
@@ -1104,8 +1089,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (!mounted) return
     if (!apiKey.trim() || !apiUrl.trim()) return
 
-    restoreModelsFromCache(apiUrl)
-    loadModels({ silent: true })
+    restoreModelsFromCacheRef.current(apiUrl)
+    void loadModelsRef.current({ silent: true })
   }, [mounted, apiKey, apiUrl])
 
   useEffect(() => {
@@ -1241,7 +1226,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
       if (files.length === 0) return
       event.preventDefault()
-      addImages(files, mode)
+      void addImagesRef.current(files, mode)
     }
 
     window.addEventListener('paste', onPaste)
@@ -1430,11 +1415,28 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                       'aspect-square border border-dashed border-slate-300 rounded-sm flex items-center justify-center cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-all duration-300 group',
                       (mode === 'generate' ? isReferenceDragActive : isEditDragActive) && 'border-slate-900 bg-slate-50'
                     )}
-                    onDragOver={(e) => { e.preventDefault(); mode === 'generate' ? setIsReferenceDragActive(true) : setIsEditDragActive(true) }}
-                    onDragLeave={() => { mode === 'generate' ? setIsReferenceDragActive(false) : setIsEditDragActive(false) }}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      if (mode === 'generate') {
+                        setIsReferenceDragActive(true)
+                      } else {
+                        setIsEditDragActive(true)
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (mode === 'generate') {
+                        setIsReferenceDragActive(false)
+                      } else {
+                        setIsEditDragActive(false)
+                      }
+                    }}
                     onDrop={(e) => {
                       e.preventDefault()
-                      mode === 'generate' ? setIsReferenceDragActive(false) : setIsEditDragActive(false)
+                      if (mode === 'generate') {
+                        setIsReferenceDragActive(false)
+                      } else {
+                        setIsEditDragActive(false)
+                      }
                       addImages(Array.from(e.dataTransfer.files || []), mode)
                     }}
                   >
@@ -1580,9 +1582,12 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                           <Loader2 className='h-8 w-8 animate-spin text-slate-300' />
                         </div>
                       )}
-                      <img 
-                        src={generatedImage} 
-                        alt='Result' 
+                      <Image
+                        src={generatedImage}
+                        alt='Result image'
+                        width={1024}
+                        height={1024}
+                        unoptimized
                         onLoad={() => setImageLoading(false)}
                         onClick={() => setPreviewImage(generatedImage)}
                         className={cn(
@@ -1792,7 +1797,14 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
            <button className='absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full' onClick={() => setPreviewImage(null)}>
              <X className='h-8 w-8 text-slate-900' />
            </button>
-           <img src={previewImage} className='max-w-[95vw] max-h-[95vh] object-contain' />
+           <Image
+             src={previewImage}
+             alt='Preview image'
+             width={2048}
+             height={2048}
+             unoptimized
+             className='max-w-[95vw] max-h-[95vh] h-auto w-auto object-contain'
+           />
         </div>
       )}
     </div>

@@ -28,6 +28,10 @@ export interface GeminiModelsResponse {
   fetchedAt: string;
 }
 
+const MODELS_CACHE_TTL_MS = 30 * 1000;
+const modelsCache = new Map<string, { value: GeminiModelsResponse; expiresAt: number }>();
+const inflightModelsFetch = new Map<string, Promise<GeminiModelsResponse>>();
+
 const DEFAULT_IMAGE_CAPABILITIES: ModelCapabilities = {
   supportsGenerate: true,
   supportsEdit: true,
@@ -125,54 +129,81 @@ function buildCapabilities(modelId: string): ModelCapabilities {
 }
 
 export async function fetchGeminiModels(apiKey: string, apiUrl: string): Promise<GeminiModelsResponse> {
-  const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-  const endpoint = `${baseUrl}/v1beta/models`;
-  const response = await fetch(endpoint, {
-    headers: {
-      'x-goog-api-key': apiKey,
-    },
-  });
-
-  if (!response.ok) {
-    const details = await response.json().catch(() => ({}));
-    const error = new Error('Failed to fetch models');
-    (error as Error & { details?: unknown; status?: number }).details = details;
-    (error as Error & { details?: unknown; status?: number }).status = response.status;
-    throw error;
+  const cacheKey = `${apiUrl.trim()}::${apiKey.trim()}`;
+  const now = Date.now();
+  const cached = modelsCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached.value;
   }
 
-  const data = await response.json();
-  const rawModels = Array.isArray(data.models) ? (data.models as GeminiModelRaw[]) : [];
+  const inFlight = inflightModelsFetch.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
 
-  const normalizedGeminiModels = rawModels
-    .map((raw) => {
-      const normalizedName = normalizeModelName(raw.name);
-      return { raw, normalizedName };
-    })
-    .filter(({ normalizedName, raw }) => isGeminiFamilyModel(normalizedName) && supportsGenerateContent(raw));
+  const fetchTask = (async (): Promise<GeminiModelsResponse> => {
+    const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
+    const endpoint = `${baseUrl}/v1beta/models`;
+    const response = await fetch(endpoint, {
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
 
-  const models = Array.from(new Set(normalizedGeminiModels.map(({ normalizedName }) => normalizedName))).sort();
+    if (!response.ok) {
+      const details = await response.json().catch(() => ({}));
+      const error = new Error('Failed to fetch models');
+      (error as Error & { details?: unknown; status?: number }).details = details;
+      (error as Error & { details?: unknown; status?: number }).status = response.status;
+      throw error;
+    }
 
-  const imageModels = normalizedGeminiModels
-    .filter(({ raw, normalizedName }) => isImageModel(raw, normalizedName))
-    .map(({ raw, normalizedName }) => ({
-      id: normalizedName,
-      displayName: raw.displayName || normalizedName,
-      capabilities: buildCapabilities(normalizedName),
-    }));
+    const data = await response.json();
+    const rawModels = Array.isArray(data.models) ? (data.models as GeminiModelRaw[]) : [];
 
-  const uniqueImageModels = Array.from(
-    new Map(imageModels.map((model) => [model.id, model])).values()
-  ).sort((a, b) => a.id.localeCompare(b.id));
+    const normalizedGeminiModels = rawModels
+      .map((raw) => {
+        const normalizedName = normalizeModelName(raw.name);
+        return { raw, normalizedName };
+      })
+      .filter(({ normalizedName, raw }) => isGeminiFamilyModel(normalizedName) && supportsGenerateContent(raw));
 
-  const promptModels = models.filter(
-    (model) => !uniqueImageModels.some((imageModel) => imageModel.id === model)
-  );
+    const models = Array.from(new Set(normalizedGeminiModels.map(({ normalizedName }) => normalizedName))).sort();
 
-  return {
-    models,
-    imageModels: uniqueImageModels,
-    promptModels,
-    fetchedAt: new Date().toISOString(),
-  };
+    const imageModels = normalizedGeminiModels
+      .filter(({ raw, normalizedName }) => isImageModel(raw, normalizedName))
+      .map(({ raw, normalizedName }) => ({
+        id: normalizedName,
+        displayName: raw.displayName || normalizedName,
+        capabilities: buildCapabilities(normalizedName),
+      }));
+
+    const uniqueImageModels = Array.from(
+      new Map(imageModels.map((model) => [model.id, model])).values()
+    ).sort((a, b) => a.id.localeCompare(b.id));
+
+    const imageModelIdSet = new Set(uniqueImageModels.map((imageModel) => imageModel.id));
+    const promptModels = models.filter((model) => !imageModelIdSet.has(model));
+
+    const result = {
+      models,
+      imageModels: uniqueImageModels,
+      promptModels,
+      fetchedAt: new Date().toISOString(),
+    };
+
+    modelsCache.set(cacheKey, {
+      value: result,
+      expiresAt: Date.now() + MODELS_CACHE_TTL_MS,
+    });
+
+    return result;
+  })();
+
+  inflightModelsFetch.set(cacheKey, fetchTask);
+  try {
+    return await fetchTask;
+  } finally {
+    inflightModelsFetch.delete(cacheKey);
+  }
 }

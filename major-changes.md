@@ -50,3 +50,10 @@
 - 变更：重写 image-generator 结构为“侧边导航 + 统计卡片 + 工作区”；新增 `/history` 与 `/trash` 路由；设置中心统一管理 API/调试/历史上限；保留实时模型、能力适配、历史与回收站、调试报告等既有功能
 - 影响：页面信息层次更清晰，创作与资产管理分区明确；历史和回收站可独立访问并通过侧边导航快速切换
 - 验证：访问 `/` `/history` `/trash` 均可正常渲染；模型加载、生成/编辑、历史恢复、回收站删除流程可用；`pnpm lint` 无 error
+
+## 2026-02-10 - 新增 Linux Docker 部署支持
+- 范围：Dockerfile, .dockerignore, next.config.ts, README.md
+- 背景：不再使用 Vercel 部署，需要可在 Linux 环境直接运行的容器化版本
+- 变更：新增多阶段 Dockerfile（pnpm 安装、Next.js 构建、standalone 运行时镜像）；新增 .dockerignore；Next 配置启用 `output: "standalone"`；README 补充 Linux 镜像构建与运行命令
+- 影响：项目可直接构建为 Linux 容器镜像并在任意 Docker 环境运行，部署方式从平台托管转为自托管容器
+- 验证：`pnpm lint` 与 `pnpm build` 通过；`docker build --platform linux/amd64 -t ai-img:linux .` 能成功构建镜像

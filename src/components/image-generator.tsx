@@ -244,14 +244,17 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     () => imageModels.filter((model) => model.capabilities.supportsEdit),
     [imageModels]
   )
+  const imageModelById = useMemo(() => {
+    return new Map(imageModels.map((model) => [model.id, model]))
+  }, [imageModels])
 
   const selectedGenerateCapabilities = useMemo(
-    () => imageModels.find((model) => model.id === generateModel)?.capabilities || DEFAULT_IMAGE_CAPABILITIES,
-    [imageModels, generateModel]
+    () => imageModelById.get(generateModel)?.capabilities || DEFAULT_IMAGE_CAPABILITIES,
+    [imageModelById, generateModel]
   )
   const selectedEditCapabilities = useMemo(
-    () => imageModels.find((model) => model.id === editModel)?.capabilities || DEFAULT_IMAGE_CAPABILITIES,
-    [imageModels, editModel]
+    () => imageModelById.get(editModel)?.capabilities || DEFAULT_IMAGE_CAPABILITIES,
+    [imageModelById, editModel]
   )
   const activeCapabilities = mode === 'generate' ? selectedGenerateCapabilities : selectedEditCapabilities
 
@@ -1097,7 +1100,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (generateModels.length === 0) {
       return
     }
-    if (!generateModels.some((item) => item.id === generateModel)) {
+    const generateModelIdSet = new Set(generateModels.map((item) => item.id))
+    if (!generateModelIdSet.has(generateModel)) {
       setGenerateModel(generateModels[0].id)
       if (generateModel) setNotice('模型已自动切换')
     }
@@ -1107,7 +1111,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (editModels.length === 0) {
       return
     }
-    if (!editModels.some((item) => item.id === editModel)) {
+    const editModelIdSet = new Set(editModels.map((item) => item.id))
+    if (!editModelIdSet.has(editModel)) {
       setEditModel(editModels[0].id)
       if (editModel) setNotice('模型已自动切换')
     }

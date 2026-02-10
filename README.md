@@ -36,6 +36,45 @@ pnpm start
 
 打开 [http://localhost:3000](http://localhost:3000) 访问应用。
 
+## Docker 部署（Linux）
+
+### 方式一：直接使用云端镜像（推荐）
+
+```bash
+# 拉取最新镜像
+docker pull qunqin45/ai-img:latest
+
+# 后台启动
+docker run -d \
+  --name ai-img \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  qunqin45/ai-img:latest
+```
+
+- `--restart unless-stopped`：容器异常退出、Docker 重启或服务器重启后自动拉起；手动 `docker stop` 后保持停止。
+- 启动后访问：`http://<你的服务器IP>:3000`
+
+### 方式二：本地构建镜像再运行（可选）
+
+```bash
+# 构建 Linux 镜像（如部署到 x86_64 Linux 服务器）
+docker build --platform linux/amd64 -t ai-img:latest .
+
+# 运行容器
+docker run -d --name ai-img --restart unless-stopped -p 3000:3000 ai-img:latest
+```
+
+### 常用运维命令
+
+```bash
+docker ps
+docker logs -f ai-img
+docker restart ai-img
+docker stop ai-img && docker rm ai-img
+```
+
+启动后访问 [http://localhost:3000](http://localhost:3000)。
 ## 技术栈
 
 - Next.js 16

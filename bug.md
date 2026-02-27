@@ -86,3 +86,24 @@
 - 原因：`URL.createObjectURL` 生成的 `blob:` 预览地址在删除图片或卸载组件时未调用 `URL.revokeObjectURL` 释放。
 - 修复：新增预览 URL 释放逻辑：删除单张图片时释放对应 URL，并在组件卸载时统一释放剩余预览 URL。
 - 验证：重复上传和删除图片后，浏览器内存曲线稳定，不再持续增长。
+
+## 2026-02-27 - 512px 分辨率走错生成通道导致实际输出为 1K
+- 位置：`src/app/api/generate/route.ts` `processTask`
+- 现象：前端选择 `512px`（0.5K）后，最终返回图片仍为 1K 尺寸。
+- 原因：后端将 `imageSize === '512px'` 单独分流到 `generateContent` 通道，导致与其他分辨率走不同请求路径，出现分辨率参数未按预期生效。
+- 修复：移除 `512px` 的特殊分流逻辑，改为仅根据 `useGoogleImageSearch` 选择通道，保持 `512px` 与其他分辨率一致的生成链路。
+- 验证：使用 `gemini-3.1-flash-image-preview` 选择 `1:1 + 512px` 生成，输出应为 512 尺寸；切换 `1K/2K/4K` 结果不受影响。
+
+## 2026-02-27 - 3.1 图片模型比例参数与官方能力不一致
+- 位置：`src/lib/gemini-models.ts`, `src/components/image-generator.tsx`, `src/app/api/generate/route.ts`, `src/app/api/edit/route.ts`
+- 现象：`gemini-3.1-flash-image-preview` 在界面中缺少官方支持的极端比例选项（`1:4`、`1:8`、`4:1`、`8:1`），且后端未校验模型可用比例，存在参数与模型能力不一致风险。
+- 原因：比例选项采用全局静态列表，未按模型能力下发与约束；后端只校验尺寸未校验比例。
+- 修复：为模型能力补充 `supportedAspectRatios`；3.1 Flash Image 按官方能力开放完整比例；前端按模型动态渲染比例并在模型切换时自动回退；生成与编辑接口新增比例合法性校验。
+- 验证：选择 `gemini-3.1-flash-image-preview` 时可见并可提交 `1:4/1:8/4:1/8:1`；切换到不支持这些比例的模型后自动回退并拒绝非法比例请求。
+
+## 2026-02-27 - 0.5K(512px) 仍输出 1K（流式接口参数失效）
+- 位置：`src/app/api/generate/route.ts` `processTask`
+- 现象：分辨率选择 `0.5K` 后，最终返回图片仍为 `1K`。
+- 原因：图片生成默认走 `streamGenerateContent`，与官方图像生成示例的 `generateContent` 通道不一致，导致 `imageConfig.imageSize=512px` 在部分网关/模型路径下未按预期生效。
+- 修复：图片生成统一改为 `generateContent`；移除 `streamGenerateContent` 分支解析；`thinkingLevel` 值同步回退为官方示例格式（`Minimal/High`）。
+- 验证：同模型同提示词下分别生成 `0.5K` 与 `1K`，输出分辨率应有明显差异且 `0.5K` 为 512 尺寸。

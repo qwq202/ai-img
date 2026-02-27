@@ -72,6 +72,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (
+      targetModel.capabilities.supportsImageSize &&
+      targetModel.capabilities.supportedImageSizes &&
+      imageSize &&
+      !targetModel.capabilities.supportedImageSizes.includes(imageSize as '512px' | '1K' | '2K' | '4K')
+    ) {
+      return jsonError(
+        400,
+        'MODEL_CAPABILITY_MISMATCH',
+        `Selected model supports image sizes: ${targetModel.capabilities.supportedImageSizes.join(', ')}`
+      );
+    }
+
+    const normalizedAspectRatio =
+      typeof aspectRatio === 'string' && aspectRatio.trim() && aspectRatio !== 'auto'
+        ? aspectRatio
+        : undefined;
+
+    if (
+      targetModel.capabilities.supportsAspectRatio &&
+      normalizedAspectRatio &&
+      targetModel.capabilities.supportedAspectRatios &&
+      !targetModel.capabilities.supportedAspectRatios.includes(normalizedAspectRatio)
+    ) {
+      return jsonError(
+        400,
+        'MODEL_CAPABILITY_MISMATCH',
+        `Selected model supports aspect ratios: ${targetModel.capabilities.supportedAspectRatios.join(', ')}`
+      );
+    }
+
     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
     const endpoint = `${baseUrl}/v1beta/models/${targetModel.id}:generateContent`;
 
@@ -100,11 +131,9 @@ export async function POST(request: NextRequest) {
     const imageConfig: { aspectRatio?: string; imageSize?: string } = {};
     if (
       targetModel.capabilities.supportsAspectRatio &&
-      typeof aspectRatio === 'string' &&
-      aspectRatio.trim() &&
-      aspectRatio !== 'auto'
+      normalizedAspectRatio
     ) {
-      imageConfig.aspectRatio = aspectRatio;
+      imageConfig.aspectRatio = normalizedAspectRatio;
     }
     if (targetModel.capabilities.forcedImageSize) {
       imageConfig.imageSize = targetModel.capabilities.forcedImageSize;

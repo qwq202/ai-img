@@ -2,9 +2,13 @@ export interface ModelCapabilities {
   supportsGenerate: boolean;
   supportsEdit: boolean;
   supportsAspectRatio: boolean;
+  supportedAspectRatios?: string[];
   supportsImageSize: boolean;
-  forcedImageSize?: '1K' | '2K' | '4K';
+  forcedImageSize?: '512px' | '1K' | '2K' | '4K';
+  supportedImageSizes?: Array<'512px' | '1K' | '2K' | '4K'>;
   supportsSearchGrounding: boolean;
+  supportsImageSearchGrounding: boolean;
+  supportsThinkingConfig: boolean;
   maxReferenceImages: number;
 }
 
@@ -31,13 +35,19 @@ export interface GeminiModelsResponse {
 const MODELS_CACHE_TTL_MS = 30 * 1000;
 const modelsCache = new Map<string, { value: GeminiModelsResponse; expiresAt: number }>();
 const inflightModelsFetch = new Map<string, Promise<GeminiModelsResponse>>();
+const BASE_ASPECT_RATIOS = ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'] as const;
+const FLASH_IMAGE_PREVIEW_ASPECT_RATIOS = [...BASE_ASPECT_RATIOS, '1:4', '1:8', '4:1', '8:1'] as const;
 
 const DEFAULT_IMAGE_CAPABILITIES: ModelCapabilities = {
   supportsGenerate: true,
   supportsEdit: true,
   supportsAspectRatio: false,
+  supportedAspectRatios: [...BASE_ASPECT_RATIOS],
   supportsImageSize: false,
+  supportedImageSizes: ['1K', '2K', '4K'],
   supportsSearchGrounding: false,
+  supportsImageSearchGrounding: false,
+  supportsThinkingConfig: false,
   maxReferenceImages: 3,
 };
 
@@ -68,8 +78,10 @@ function isImageModel(model: GeminiModelRaw, normalizedName: string): boolean {
   return IMAGE_KEYWORDS.some((keyword) => haystack.includes(keyword));
 }
 
-function parseForcedImageSize(modelId: string): '1K' | '2K' | '4K' | undefined {
+function parseForcedImageSize(modelId: string): '512px' | '1K' | '2K' | '4K' | undefined {
   const normalized = modelId.toLowerCase();
+  if (normalized.includes('-512px')) return '512px';
+  if (normalized.includes('-0.5k')) return '512px';
   if (normalized.includes('-4k')) return '4K';
   if (normalized.includes('-hd')) return '2K';
   if (normalized.includes('-2k')) return '2K';
@@ -88,15 +100,22 @@ function buildCapabilities(modelId: string): ModelCapabilities {
     normalized.includes('gemini-3-pro-image') ||
     normalized.includes('nano-banana-pro') ||
     normalized.includes('nano-banana-2');
+  const isFlashImagePreviewFamily =
+    normalized.includes('gemini-3.1-flash-image-preview') ||
+    normalized.includes('gemini-3-flash-image-preview');
 
   if (isEditOnlyModel) {
     return {
       supportsGenerate: false,
       supportsEdit: true,
       supportsAspectRatio: false,
+      supportedAspectRatios: [...BASE_ASPECT_RATIOS],
       supportsImageSize: !!forcedImageSize,
       forcedImageSize,
+      supportedImageSizes: forcedImageSize ? [forcedImageSize] : ['1K', '2K', '4K'],
       supportsSearchGrounding: false,
+      supportsImageSearchGrounding: false,
+      supportsThinkingConfig: false,
       maxReferenceImages: 3,
     };
   }
@@ -106,9 +125,29 @@ function buildCapabilities(modelId: string): ModelCapabilities {
       supportsGenerate: true,
       supportsEdit: true,
       supportsAspectRatio: true,
+      supportedAspectRatios: [...BASE_ASPECT_RATIOS],
       supportsImageSize: true,
       forcedImageSize,
+      supportedImageSizes: forcedImageSize ? [forcedImageSize] : ['1K', '2K', '4K'],
       supportsSearchGrounding: true,
+      supportsImageSearchGrounding: false,
+      supportsThinkingConfig: false,
+      maxReferenceImages: 14,
+    };
+  }
+
+  if (isFlashImagePreviewFamily) {
+    return {
+      supportsGenerate: true,
+      supportsEdit: true,
+      supportsAspectRatio: true,
+      supportedAspectRatios: [...FLASH_IMAGE_PREVIEW_ASPECT_RATIOS],
+      supportsImageSize: true,
+      forcedImageSize,
+      supportedImageSizes: forcedImageSize ? [forcedImageSize] : ['512px', '1K', '2K', '4K'],
+      supportsSearchGrounding: true,
+      supportsImageSearchGrounding: true,
+      supportsThinkingConfig: true,
       maxReferenceImages: 14,
     };
   }
@@ -118,9 +157,13 @@ function buildCapabilities(modelId: string): ModelCapabilities {
       supportsGenerate: true,
       supportsEdit: true,
       supportsAspectRatio: true,
+      supportedAspectRatios: [...BASE_ASPECT_RATIOS],
       supportsImageSize: false,
       forcedImageSize,
+      supportedImageSizes: forcedImageSize ? [forcedImageSize] : ['1K', '2K', '4K'],
       supportsSearchGrounding: false,
+      supportsImageSearchGrounding: false,
+      supportsThinkingConfig: false,
       maxReferenceImages: 3,
     };
   }

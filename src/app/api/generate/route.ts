@@ -165,6 +165,9 @@ async function processTask(
   aspectRatio: string | undefined,
   imageSize: string,
   useGoogleSearch: boolean,
+  useGoogleImageSearch: boolean,
+  thinkingLevel: 'minimal' | 'high',
+  includeThoughts: boolean,
   referenceImages: ReferenceImage[],
   apiKey: string,
   apiUrl: string,
@@ -183,7 +186,6 @@ async function processTask(
     }
 
     const baseUrl = apiUrl.endsWith('/') ? apiUrl.slice(0, -1) : apiUrl;
-    const endpoint = `${baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse`;
 
     const parts: Array<{ text?: string; inline_data?: { mime_type: string; data: string } }> = [
       { text: prompt }
@@ -203,6 +205,7 @@ async function processTask(
     const generationConfig: {
       responseModalities: string[];
       imageConfig?: { aspectRatio?: string; imageSize?: string };
+      thinkingConfig?: { thinkingLevel: 'Minimal' | 'High'; includeThoughts: boolean };
     } = {
       responseModalities: ['TEXT', 'IMAGE'],
     };
@@ -222,7 +225,14 @@ async function processTask(
     const requestBody: {
       contents: Array<{ parts: typeof parts }>;
       generationConfig: typeof generationConfig;
-      tools?: Array<{ google_search: Record<string, never> }>;
+      tools?: Array<{
+        google_search: {
+          searchTypes?: {
+            webSearch?: Record<string, never>;
+            imageSearch?: Record<string, never>;
+          };
+        };
+      }>;
     } = {
       contents: [{
         parts
@@ -230,9 +240,40 @@ async function processTask(
       generationConfig
     };
 
-    if (useGoogleSearch && capabilities.supportsSearchGrounding) {
-      requestBody.tools = [{ google_search: {} }];
+    if (capabilities.supportsThinkingConfig) {
+      requestBody.generationConfig.thinkingConfig = {
+        thinkingLevel: thinkingLevel === 'high' ? 'High' : 'Minimal',
+        includeThoughts
+      };
     }
+
+    const enableWebSearch = useGoogleSearch && capabilities.supportsSearchGrounding;
+    const enableImageSearch = useGoogleImageSearch && capabilities.supportsImageSearchGrounding;
+
+    if (enableWebSearch || enableImageSearch) {
+      const googleSearchTool: {
+        searchTypes?: {
+          webSearch?: Record<string, never>;
+          imageSearch?: Record<string, never>;
+        };
+      } = {};
+
+      if (enableWebSearch || enableImageSearch) {
+        googleSearchTool.searchTypes = {};
+        if (enableWebSearch) {
+          googleSearchTool.searchTypes.webSearch = {};
+        }
+        if (enableImageSearch) {
+          googleSearchTool.searchTypes.imageSearch = {};
+        }
+      }
+
+      requestBody.tools = [{ google_search: googleSearchTool }];
+    }
+
+    // Official image generation examples use generateContent.
+    // Use a single transport to avoid capability drift on size handling.
+    const endpoint = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
     console.log(`[Task ${taskId}] Starting API request to ${endpoint}`);
     taskStore.updateTask(taskId, { phase: 'calling_model' });
@@ -246,43 +287,36 @@ async function processTask(
       body: JSON.stringify(requestBody),
     });
 
-    console.log(`[Task ${taskId}] Received SSE response, length: ${responseText.length}`);
+    console.log(`[Task ${taskId}] Received response, length: ${responseText.length}`);
     taskStore.updateTask(taskId, { phase: 'parsing_response' });
 
     let generatedText = '';
     let generatedImage = '';
     let groundingMetadata = null;
 
-    const lines = responseText.split('\n');
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr || jsonStr === '[DONE]') continue;
+    const data = JSON.parse(responseText) as {
+      candidates?: Array<{
+        groundingMetadata?: unknown;
+        content?: {
+          parts?: Array<{ text?: string; inlineData?: { mimeType?: string; data?: string } }>;
+        };
+      }>;
+    };
 
-        try {
-          const chunk = JSON.parse(jsonStr);
+    const candidate = data.candidates?.[0];
+    const partsResponse = candidate?.content?.parts || [];
 
-          if (chunk.candidates && chunk.candidates.length > 0) {
-            const candidate = chunk.candidates[0];
-            const partsResponse = candidate.content?.parts || [];
-
-            for (const part of partsResponse) {
-              if (part.text) {
-                generatedText += part.text;
-              }
-              if (part.inlineData) {
-                generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-              }
-            }
-          }
-
-          if (chunk.groundingMetadata) {
-            groundingMetadata = chunk.groundingMetadata;
-          }
-        } catch {
-          console.log(`[Task ${taskId}] Failed to parse SSE chunk:`, jsonStr.substring(0, 100));
-        }
+    for (const part of partsResponse) {
+      if (part.text) {
+        generatedText += part.text;
       }
+      if (part.inlineData?.mimeType && part.inlineData?.data) {
+        generatedImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+
+    if (candidate?.groundingMetadata) {
+      groundingMetadata = candidate.groundingMetadata;
     }
 
     console.log(`[Task ${taskId}] Parsed response - text length: ${generatedText.length}, has image: ${!!generatedImage}`);
@@ -336,6 +370,9 @@ export async function POST(request: NextRequest) {
       aspectRatio,
       imageSize = '1K',
       useGoogleSearch = false,
+      useGoogleImageSearch = false,
+      thinkingLevel = 'minimal',
+      includeThoughts = false,
       referenceImages = []
     } = body as {
       prompt?: string;
@@ -343,6 +380,9 @@ export async function POST(request: NextRequest) {
       aspectRatio?: string;
       imageSize?: string;
       useGoogleSearch?: boolean;
+      useGoogleImageSearch?: boolean;
+      thinkingLevel?: 'minimal' | 'high';
+      includeThoughts?: boolean;
       referenceImages?: Array<{ mimeType?: string; data?: string }>;
     };
 
@@ -386,10 +426,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (
+      targetModel.capabilities.supportsImageSize &&
+      targetModel.capabilities.supportedImageSizes &&
+      imageSize &&
+      !targetModel.capabilities.supportedImageSizes.includes(imageSize as '512px' | '1K' | '2K' | '4K')
+    ) {
+      return jsonError(
+        400,
+        'MODEL_CAPABILITY_MISMATCH',
+        `Selected model supports image sizes: ${targetModel.capabilities.supportedImageSizes.join(', ')}`
+      );
+    }
+
+    if (thinkingLevel !== 'minimal' && thinkingLevel !== 'high') {
+      return jsonError(400, 'INVALID_INPUT', 'thinkingLevel must be minimal or high');
+    }
+
+    if (includeThoughts && !targetModel.capabilities.supportsThinkingConfig) {
+      return jsonError(400, 'MODEL_CAPABILITY_MISMATCH', 'Selected model does not support includeThoughts');
+    }
+
+    if (useGoogleImageSearch && !targetModel.capabilities.supportsImageSearchGrounding) {
+      return jsonError(400, 'MODEL_CAPABILITY_MISMATCH', 'Selected model does not support image search grounding');
+    }
+
     const normalizedAspectRatio =
       typeof aspectRatio === 'string' && aspectRatio.trim() && aspectRatio !== 'auto'
         ? aspectRatio
         : undefined;
+
+    if (
+      targetModel.capabilities.supportsAspectRatio &&
+      normalizedAspectRatio &&
+      targetModel.capabilities.supportedAspectRatios &&
+      !targetModel.capabilities.supportedAspectRatios.includes(normalizedAspectRatio)
+    ) {
+      return jsonError(
+        400,
+        'MODEL_CAPABILITY_MISMATCH',
+        `Selected model supports aspect ratios: ${targetModel.capabilities.supportedAspectRatios.join(', ')}`
+      );
+    }
 
     const taskId = taskStore.createTask({
       prompt,
@@ -404,6 +482,9 @@ export async function POST(request: NextRequest) {
       normalizedAspectRatio,
       imageSize,
       useGoogleSearch,
+      useGoogleImageSearch,
+      thinkingLevel,
+      includeThoughts,
       normalizedImages,
       apiKey,
       apiUrl,

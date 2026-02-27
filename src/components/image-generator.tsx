@@ -47,9 +47,13 @@ interface ModelCapabilities {
   supportsGenerate: boolean
   supportsEdit: boolean
   supportsAspectRatio: boolean
+  supportedAspectRatios?: string[]
   supportsImageSize: boolean
-  forcedImageSize?: '1K' | '2K' | '4K'
+  forcedImageSize?: '512px' | '1K' | '2K' | '4K'
+  supportedImageSizes?: Array<'512px' | '1K' | '2K' | '4K'>
   supportsSearchGrounding: boolean
+  supportsImageSearchGrounding: boolean
+  supportsThinkingConfig: boolean
   maxReferenceImages: number
 }
 
@@ -102,12 +106,23 @@ const DEFAULT_IMAGE_CAPABILITIES: ModelCapabilities = {
   supportsGenerate: true,
   supportsEdit: true,
   supportsAspectRatio: false,
+  supportedAspectRatios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
   supportsImageSize: false,
+  supportedImageSizes: ['1K', '2K', '4K'],
   supportsSearchGrounding: false,
+  supportsImageSearchGrounding: false,
+  supportsThinkingConfig: false,
   maxReferenceImages: 3,
 }
 
-const ASPECT_RATIOS = ['auto', '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9']
+const ASPECT_RATIOS = ['auto', '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9', '1:4', '1:8', '4:1', '8:1']
+const IMAGE_SIZES = ['512px', '1K', '2K', '4K'] as const
+const IMAGE_SIZE_LABELS: Record<(typeof IMAGE_SIZES)[number], string> = {
+  '512px': '0.5K',
+  '1K': '1K',
+  '2K': '2K',
+  '4K': '4K',
+}
 const HISTORY_KEY = 'gemini_image_history_v1'
 const TRASH_KEY = 'gemini_image_trash_v1'
 const HISTORY_LIMIT_KEY = 'gemini_image_history_limit'
@@ -117,6 +132,8 @@ const GENERATE_MODEL_KEY = 'gemini_generate_model'
 const EDIT_MODEL_KEY = 'gemini_edit_model'
 const ASPECT_RATIO_KEY = 'gemini_aspect_ratio'
 const GOOGLE_SEARCH_KEY = 'gemini_use_google_search'
+const GOOGLE_IMAGE_SEARCH_KEY = 'gemini_use_google_image_search'
+const THINKING_LEVEL_KEY = 'gemini_thinking_level'
 
 export default function ImageGenerator({ initialPage = 'studio' }: ImageGeneratorProps) {
   const pathname = usePathname()
@@ -140,6 +157,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   const [aspectRatio, setAspectRatio] = useState('auto')
   const [imageSize, setImageSize] = useState('1K')
   const [useGoogleSearch, setUseGoogleSearch] = useState(false)
+  const [useGoogleImageSearch, setUseGoogleImageSearch] = useState(false)
+  const [thinkingLevel, setThinkingLevel] = useState<'minimal' | 'high'>('minimal')
   const [autoSaveToHistory, setAutoSaveToHistory] = useState(true)
   const [generateCount, setGenerateCount] = useState(1)
 
@@ -257,6 +276,18 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     [imageModelById, editModel]
   )
   const activeCapabilities = mode === 'generate' ? selectedGenerateCapabilities : selectedEditCapabilities
+  const availableAspectRatios = useMemo(
+    () => (activeCapabilities.supportedAspectRatios?.length
+      ? ['auto', ...activeCapabilities.supportedAspectRatios]
+      : ASPECT_RATIOS),
+    [activeCapabilities.supportedAspectRatios]
+  )
+  const availableImageSizes = useMemo(
+    () => (activeCapabilities.supportedImageSizes?.length
+      ? activeCapabilities.supportedImageSizes
+      : IMAGE_SIZES),
+    [activeCapabilities.supportedImageSizes]
+  )
 
   const generateMaxReferenceImages = selectedGenerateCapabilities.maxReferenceImages
   const editMaxReferenceImages = selectedEditCapabilities.maxReferenceImages
@@ -792,6 +823,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         aspectRatio?: string
         imageSize?: string
         useGoogleSearch?: boolean
+        useGoogleImageSearch?: boolean
+        thinkingLevel?: 'minimal' | 'high'
+        includeThoughts?: boolean
       } = {
         prompt,
         model: generateModel,
@@ -805,6 +839,13 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         requestBody.imageSize = selectedGenerateCapabilities.forcedImageSize || imageSize
       }
       if (selectedGenerateCapabilities.supportsSearchGrounding) requestBody.useGoogleSearch = useGoogleSearch
+      if (selectedGenerateCapabilities.supportsImageSearchGrounding) {
+        requestBody.useGoogleImageSearch = useGoogleImageSearch
+      }
+      if (selectedGenerateCapabilities.supportsThinkingConfig) {
+        requestBody.thinkingLevel = thinkingLevel
+        requestBody.includeThoughts = false
+      }
 
       const runCount = Math.max(1, Math.min(8, Math.floor(generateCount)))
       const taskIds: string[] = []
@@ -968,6 +1009,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     setEditModel('')
     setAspectRatio('auto')
     setUseGoogleSearch(false)
+    setUseGoogleImageSearch(false)
+    setThinkingLevel('minimal')
     setAutoSaveToHistory(true)
     setGenerateCount(1)
 
@@ -975,6 +1018,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     localStorage.removeItem(EDIT_MODEL_KEY)
     localStorage.removeItem(ASPECT_RATIO_KEY)
     localStorage.removeItem(GOOGLE_SEARCH_KEY)
+    localStorage.removeItem(GOOGLE_IMAGE_SEARCH_KEY)
+    localStorage.removeItem(THINKING_LEVEL_KEY)
     localStorage.removeItem(AUTO_SAVE_HISTORY_KEY)
     localStorage.removeItem(GENERATE_COUNT_KEY)
 
@@ -1007,6 +1052,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const storedEditModel = localStorage.getItem(EDIT_MODEL_KEY) || ''
     const storedAspectRatio = localStorage.getItem(ASPECT_RATIO_KEY) || ''
     const storedGoogleSearch = localStorage.getItem(GOOGLE_SEARCH_KEY) || ''
+    const storedGoogleImageSearch = localStorage.getItem(GOOGLE_IMAGE_SEARCH_KEY) || ''
+    const storedThinkingLevel = localStorage.getItem(THINKING_LEVEL_KEY) || ''
 
     if (storedKey) setApiKey(storedKey)
     if (storedUrl) setApiUrl(storedUrl)
@@ -1017,6 +1064,10 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (storedEditModel) setEditModel(storedEditModel)
     if (storedAspectRatio) setAspectRatio(storedAspectRatio)
     if (storedGoogleSearch) setUseGoogleSearch(storedGoogleSearch === '1')
+    if (storedGoogleImageSearch) setUseGoogleImageSearch(storedGoogleImageSearch === '1')
+    if (storedThinkingLevel === 'minimal' || storedThinkingLevel === 'high') {
+      setThinkingLevel(storedThinkingLevel)
+    }
 
     if (storedHistoryLimit) {
       const parsed = Number(storedHistoryLimit)
@@ -1136,6 +1187,19 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   }, [selectedGenerateCapabilities.supportsSearchGrounding, useGoogleSearch])
 
   useEffect(() => {
+    if (!selectedGenerateCapabilities.supportsImageSearchGrounding && useGoogleImageSearch) {
+      setUseGoogleImageSearch(false)
+      setNotice('当前模型不支持图片搜索')
+    }
+  }, [selectedGenerateCapabilities.supportsImageSearchGrounding, useGoogleImageSearch])
+
+  useEffect(() => {
+    if (!selectedGenerateCapabilities.supportsThinkingConfig && thinkingLevel !== 'minimal') {
+      setThinkingLevel('minimal')
+    }
+  }, [selectedGenerateCapabilities.supportsThinkingConfig, thinkingLevel])
+
+  useEffect(() => {
     if (selectedGenerateCapabilities.forcedImageSize && imageSize !== selectedGenerateCapabilities.forcedImageSize) {
       setImageSize(selectedGenerateCapabilities.forcedImageSize)
     }
@@ -1146,6 +1210,23 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       setImageSize(selectedEditCapabilities.forcedImageSize)
     }
   }, [selectedEditCapabilities.forcedImageSize, imageSize])
+
+  useEffect(() => {
+    if (!activeCapabilities.supportsAspectRatio && aspectRatio !== 'auto') {
+      setAspectRatio('auto')
+      return
+    }
+    if (!activeCapabilities.supportsAspectRatio) return
+    if (availableAspectRatios.includes(aspectRatio)) return
+    setAspectRatio(availableAspectRatios[0] || 'auto')
+  }, [activeCapabilities.supportsAspectRatio, availableAspectRatios, aspectRatio])
+
+  useEffect(() => {
+    if (activeCapabilities.forcedImageSize) return
+    if (!activeCapabilities.supportsImageSize) return
+    if (availableImageSizes.includes(imageSize as (typeof IMAGE_SIZES)[number])) return
+    setImageSize(availableImageSizes[0])
+  }, [activeCapabilities.forcedImageSize, activeCapabilities.supportsImageSize, availableImageSizes, imageSize])
 
   useEffect(() => {
     if (!mounted || !prefsHydrated) return
@@ -1181,6 +1262,16 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (!mounted || !prefsHydrated) return
     localStorage.setItem(GOOGLE_SEARCH_KEY, useGoogleSearch ? '1' : '0')
   }, [mounted, prefsHydrated, useGoogleSearch])
+
+  useEffect(() => {
+    if (!mounted || !prefsHydrated) return
+    localStorage.setItem(GOOGLE_IMAGE_SEARCH_KEY, useGoogleImageSearch ? '1' : '0')
+  }, [mounted, prefsHydrated, useGoogleImageSearch])
+
+  useEffect(() => {
+    if (!mounted || !prefsHydrated) return
+    localStorage.setItem(THINKING_LEVEL_KEY, thinkingLevel)
+  }, [mounted, prefsHydrated, thinkingLevel])
 
   useEffect(() => {
     if (!mounted || !prefsHydrated) return
@@ -1479,10 +1570,14 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 
                 <div className='space-y-1.5'>
                   <Label className='text-xs text-slate-500'>比例</Label>
-                  <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                  <Select
+                    value={aspectRatio}
+                    onValueChange={setAspectRatio}
+                    disabled={!activeCapabilities.supportsAspectRatio}
+                  >
                     <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='自动' /></SelectTrigger>
                     <SelectContent>
-                      {ASPECT_RATIOS.map((r) => <SelectItem key={r} value={r} className='text-xs'>{r}</SelectItem>)}
+                      {availableAspectRatios.map((r) => <SelectItem key={r} value={r} className='text-xs'>{r}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1496,34 +1591,79 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                   >
                     <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='1K' /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value='1K' className='text-xs'>1K</SelectItem>
-                      <SelectItem value='2K' className='text-xs'>2K</SelectItem>
-                      <SelectItem value='4K' className='text-xs'>4K</SelectItem>
+                      {availableImageSizes.map((size) => (
+                        <SelectItem key={size} value={size} className='text-xs'>
+                          {IMAGE_SIZE_LABELS[size as (typeof IMAGE_SIZES)[number]] || size}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {activeCapabilities.forcedImageSize ? (
-                    <p className='text-[11px] text-slate-500'>固定为 {activeCapabilities.forcedImageSize}</p>
+                    <p className='text-[11px] text-slate-500'>
+                      固定为 {IMAGE_SIZE_LABELS[activeCapabilities.forcedImageSize] || activeCapabilities.forcedImageSize}
+                    </p>
                   ) : null}
                 </div>
               </div>
 
               {mode === 'generate' && (
-                <div className={cn(
-                  'flex items-center justify-between rounded-sm border border-slate-200 bg-white p-3 shadow-sm transition-all',
-                  selectedGenerateCapabilities.supportsSearchGrounding ? 'hover:shadow-md hover:border-slate-300' : 'opacity-60 cursor-not-allowed bg-slate-50'
-                )}>
-                  <div className='space-y-0.5'>
-                    <Label htmlFor='google-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>使用 Google 搜索</Label>
-                    <p className='text-xs text-slate-500'>
-                      {selectedGenerateCapabilities.supportsSearchGrounding ? '基于实时信息生成图片' : '当前模型不支持此功能'}
-                    </p>
+                <div className='space-y-3'>
+                  <div className={cn(
+                    'flex items-center justify-between rounded-sm border border-slate-200 bg-white p-3 shadow-sm transition-all',
+                    selectedGenerateCapabilities.supportsSearchGrounding ? 'hover:shadow-md hover:border-slate-300' : 'opacity-60 cursor-not-allowed bg-slate-50'
+                  )}>
+                    <div className='space-y-0.5'>
+                      <Label htmlFor='google-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>使用 Google 搜索</Label>
+                      <p className='text-xs text-slate-500'>
+                        {selectedGenerateCapabilities.supportsSearchGrounding ? '基于实时信息生成图片' : '当前模型不支持此功能'}
+                      </p>
+                    </div>
+                    <Switch
+                      id='google-search'
+                      checked={useGoogleSearch}
+                      onCheckedChange={setUseGoogleSearch}
+                      disabled={!selectedGenerateCapabilities.supportsSearchGrounding}
+                    />
                   </div>
-                  <Switch 
-                    id='google-search' 
-                    checked={useGoogleSearch} 
-                    onCheckedChange={setUseGoogleSearch} 
-                    disabled={!selectedGenerateCapabilities.supportsSearchGrounding}
-                  />
+
+                  <div className={cn(
+                    'flex items-center justify-between rounded-sm border border-slate-200 bg-white p-3 shadow-sm transition-all',
+                    selectedGenerateCapabilities.supportsImageSearchGrounding
+                      ? 'hover:shadow-md hover:border-slate-300'
+                      : 'opacity-60 cursor-not-allowed bg-slate-50'
+                  )}>
+                    <div className='space-y-0.5'>
+                      <Label htmlFor='google-image-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsImageSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>使用 Google 图片搜索</Label>
+                      <p className='text-xs text-slate-500'>
+                        {selectedGenerateCapabilities.supportsImageSearchGrounding ? '引入图片搜索视觉上下文（3.1 Flash）' : '当前模型不支持图片搜索'}
+                      </p>
+                    </div>
+                    <Switch
+                      id='google-image-search'
+                      checked={useGoogleImageSearch}
+                      onCheckedChange={setUseGoogleImageSearch}
+                      disabled={!selectedGenerateCapabilities.supportsImageSearchGrounding}
+                    />
+                  </div>
+
+                  <div className={cn(
+                    'rounded-sm border border-slate-200 bg-white p-3 shadow-sm transition-all',
+                    selectedGenerateCapabilities.supportsThinkingConfig ? 'hover:shadow-md hover:border-slate-300' : 'opacity-60 cursor-not-allowed bg-slate-50'
+                  )}>
+                    <div className='space-y-1.5'>
+                      <Label className='text-sm font-medium text-slate-900'>思考等级</Label>
+                      <p className='text-xs text-slate-500'>
+                        {selectedGenerateCapabilities.supportsThinkingConfig ? '更高思考质量更稳，但延迟更高' : '当前模型不支持思考等级配置'}
+                      </p>
+                      <Select value={thinkingLevel} onValueChange={(value) => setThinkingLevel(value as 'minimal' | 'high')} disabled={!selectedGenerateCapabilities.supportsThinkingConfig}>
+                        <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='低' /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value='minimal' className='text-xs'>低</SelectItem>
+                          <SelectItem value='high' className='text-xs'>高</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               )}
 

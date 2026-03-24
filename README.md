@@ -25,6 +25,9 @@ AI automatically optimizes your prompts for more accurate generation results.
 ### Real-time Search Enhancement
 Connect to Google Search for real-time information to assist image generation.
 
+### Multi-language Support
+Supports 7 languages: English, 简体中文, 日本語, 한국어, Français, Deutsch, Español. Language can be switched in settings, and prompt optimization will output in the corresponding language.
+
 ## Interface Preview
 
 **Home** - Enter descriptions, adjust parameters, upload reference images, and generate AI images with one click.

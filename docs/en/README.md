@@ -7,8 +7,6 @@ An elegant AI image generation tool based on Google Gemini API, supporting text-
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-> 📄 Available in other languages: [简体中文](docs/zh-CN/README.md) | [日本語](docs/ja/README.md) | [한국어](docs/ko/README.md) | [Français](docs/fr/README.md) | [Deutsch](docs/de/README.md) | [Español](docs/es/README.md)
-
 ## Core Features
 
 ### Text-to-Image
@@ -29,15 +27,15 @@ Connect to Google Search for real-time information to assist image generation.
 
 **Home** - Enter descriptions, adjust parameters, upload reference images, and generate AI images with one click.
 
-![Home](image/首页.png)
+![Home](../image/首页.png)
 
 **History** - Automatically saves all generation records for easy review and management of past works.
 
-![History](image/历史.png)
+![History](../image/历史.png)
 
 **Settings** - Configure API Key and preferences to customize your generation experience.
 
-![Settings](image/设置.png)
+![Settings](../image/设置.png)
 
 ## Vercel Deployment
 

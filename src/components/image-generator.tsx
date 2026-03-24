@@ -27,6 +27,7 @@ import {
 
 import { cn } from '@/lib/utils'
 import { idbGet, idbSet } from '@/lib/indexeddb'
+import { useI18n, Locale } from '@/lib/i18n'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -138,6 +139,7 @@ const THINKING_LEVEL_KEY = 'gemini_thinking_level'
 export default function ImageGenerator({ initialPage = 'studio' }: ImageGeneratorProps) {
   const pathname = usePathname()
   const router = useRouter()
+  const { t, locale, setLocale } = useI18n()
 
   const [mounted, setMounted] = useState(false)
   const [prefsHydrated, setPrefsHydrated] = useState(false)
@@ -146,7 +148,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   const [prompt, setPrompt] = useState('')
   const [loading, setLoading] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
-  const [loadingMessage, setLoadingMessage] = useState('等待任务...')
+  const [loadingMessage, setLoadingMessage] = useState(t('messages.waiting'))
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -297,24 +299,24 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     console.debug('[debug]', { ts: new Date().toISOString(), event, data })
   }
 
-  const friendlyMessageFromUnknown = (error: unknown, fallback = '请求失败，请稍后重试') => {
+  const friendlyMessageFromUnknown = (error: unknown, fallback = t('messages.generateFailed')) => {
     const raw = error instanceof Error ? error.message : ''
     const normalized = raw.toLowerCase()
 
     if (normalized.includes('auth_unavailable') || normalized.includes('no auth available')) {
-      return '上游鉴权服务暂不可用，请稍后重试'
+      return t('messages.upstreamAuthUnavailable')
     }
     if (normalized.includes('system memory overloaded')) {
-      return '服务端暂时不可用，请稍后重试'
+      return t('messages.serverUnavailable')
     }
     if (normalized.includes('timeout') || normalized.includes('timed out') || normalized.includes('aborterror')) {
-      return '请求超时，请稍后重试'
+      return t('messages.timeout')
     }
     if (normalized.includes('failed to fetch') || normalized.includes('networkerror')) {
-      return '网络连接异常，请检查网络后重试'
+      return t('messages.networkError')
     }
     if (normalized.includes('provided image is not valid')) {
-      return '上传图片无效，请更换图片后重试'
+      return t('messages.invalidImage')
     }
     return raw || fallback
   }
@@ -322,33 +324,33 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   const friendlyMessageFromResponse = (
     status: number,
     payload: ApiErrorLike | undefined,
-    fallback = '请求失败，请稍后重试'
+    fallback = t('messages.generateFailed')
   ) => {
     const code = payload?.code || payload?.details?.error?.code
     const upstreamMessage = payload?.details?.error?.message || payload?.message || payload?.error || ''
     const normalizedUpstream = String(upstreamMessage).toLowerCase()
 
     if (normalizedUpstream.includes('auth_unavailable') || normalizedUpstream.includes('no auth available')) {
-      return '上游鉴权服务暂不可用，请稍后重试'
+      return t('messages.upstreamAuthUnavailable')
     }
-    if (status === 503) return '服务端暂时不可用，请稍后重试'
-    if (status === 504) return '服务端响应超时，请稍后重试'
-    if (status === 502) return '服务连接异常，请稍后重试'
-    if (status === 500) return '服务端发生错误，请稍后重试'
-    if (status === 429) return '请求过于频繁，请稍后再试'
-    if (status === 401 || status === 403) return '鉴权失败，请检查 API Key 是否正确'
-    if (status === 404) return '请求的模型或接口不存在，请刷新模型列表后重试'
+    if (status === 503) return t('messages.serverUnavailable')
+    if (status === 504) return t('messages.timeout')
+    if (status === 502) return t('messages.serverError')
+    if (status === 500) return t('messages.serverError')
+    if (status === 429) return t('messages.rateLimited')
+    if (status === 401 || status === 403) return t('messages.authFailed')
+    if (status === 404) return t('messages.notFound')
 
-    if (code === 'MODEL_NOT_AVAILABLE') return '当前模型不可用，请刷新模型列表后重试'
-    if (code === 'MODEL_CAPABILITY_MISMATCH') return '当前模型不支持所选参数或输入图片'
-    if (code === 'API_CONFIG_MISSING') return 'API 配置缺失，请在设置中检查 Key 和 URL'
-    if (code === 'INVALID_INPUT') return '请求参数无效，请检查提示词和图片'
+    if (code === 'MODEL_NOT_AVAILABLE') return t('messages.modelNotAvailable')
+    if (code === 'MODEL_CAPABILITY_MISMATCH') return t('messages.capabilityMismatch')
+    if (code === 'API_CONFIG_MISSING') return t('messages.apiConfigMissing')
+    if (code === 'INVALID_INPUT') return t('messages.invalidInput')
 
     if (normalizedUpstream.includes('system memory overloaded')) {
-      return '服务端暂时不可用，请稍后重试'
+      return t('messages.serverUnavailable')
     }
     if (normalizedUpstream.includes('provided image is not valid')) {
-      return '上传图片无效，请更换图片后重试'
+      return t('messages.invalidImage')
     }
 
     return upstreamMessage || fallback
@@ -357,11 +359,11 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   const getModelsCacheKey = (rawUrl: string) => `gemini_models_cache_${encodeURIComponent(rawUrl.trim().toLowerCase())}`
 
   const mapTaskPhaseToMessage = (phase?: string) => {
-    if (phase === 'queued') return '排队中...'
-    if (phase === 'preparing') return '准备中...'
-    if (phase === 'calling_model') return '处理中...'
-    if (phase === 'parsing_response') return '解析中...'
-    return mode === 'generate' ? '生成中...' : '修改中...'
+    if (phase === 'queued') return t('messages.queued')
+    if (phase === 'preparing') return t('messages.preparing')
+    if (phase === 'calling_model') return t('messages.processing')
+    if (phase === 'parsing_response') return t('messages.parsing')
+    return mode === 'generate' ? t('messages.generating') : t('messages.editing')
   }
 
   const persistHistory = (next: HistoryItem[]) => {
@@ -394,7 +396,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (!target) return
     setHistoryItems((prev) => prev.filter((item) => item.id !== id))
     setTrashItems((prev) => [target, ...prev].slice(0, 300))
-    setNotice('已移入回收站')
+    setNotice(t('messages.movedToTrash'))
   }
 
   const restoreTrashItem = (id: string) => {
@@ -402,17 +404,17 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     if (!target) return
     setTrashItems((prev) => prev.filter((item) => item.id !== id))
     persistHistory([target, ...historyItems])
-    setNotice('已恢复')
+    setNotice(t('messages.restored'))
   }
 
   const deleteTrashItemPermanently = (id: string) => {
     setTrashItems((prev) => prev.filter((item) => item.id !== id))
-    setNotice('已永久删除')
+    setNotice(t('messages.permanentlyDeleted'))
   }
 
   const clearTrash = () => {
     setTrashItems([])
-    setNotice('回收站已清空')
+    setNotice(t('messages.trashCleared'))
   }
 
   const buildApiHeaders = (includeContentType = false) => {
@@ -465,7 +467,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
       if (!response.ok) {
         addDebugLog('models_fetch_failed', { status: response.status, error: data?.error })
-        throw new Error(friendlyMessageFromResponse(response.status, data, '模型加载失败，请稍后重试'))
+        throw new Error(friendlyMessageFromResponse(response.status, data, t('messages.modelLoadFailed')))
       }
 
       const nextImageModels = Array.isArray(data.imageModels)
@@ -505,7 +507,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       if (!silent) {
         setImageModels([])
         setPromptModels([])
-        setError(friendlyMessageFromUnknown(err, '模型加载失败，请稍后重试'))
+        setError(friendlyMessageFromUnknown(err, t('messages.modelLoadFailed')))
       }
     } finally {
       if (!silent) setModelsLoading(false)
@@ -518,19 +520,19 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const trimmedUrl = apiUrl.trim()
 
     if (!trimmedKey || !trimmedUrl) {
-      setError('请填写 Key 和 URL')
+      setError(t('messages.fillKeyAndUrl'))
       return
     }
 
     try {
       new URL(trimmedUrl)
     } catch {
-      setError('URL 无效')
+      setError(t('messages.invalidUrl'))
       return
     }
 
     setConnectionTesting(true)
-    setNotice('测试连接中...')
+    setNotice(t('actions.testing'))
     setError('')
     addDebugLog('connection_test_start')
 
@@ -544,20 +546,20 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       const data = (await response.json().catch(() => ({}))) as ModelsApiResponse
 
       if (!response.ok) {
-        const message = friendlyMessageFromResponse(response.status, data, '连接失败，请稍后重试')
-        setError(`连接失败：${message}`)
+        const message = friendlyMessageFromResponse(response.status, data, t('messages.generateFailed'))
+        setError(`Connection failed: ${message}`)
         addDebugLog('connection_test_failed', { status: response.status, message })
         return
       }
 
       const imageCount = Array.isArray(data.imageModels) ? data.imageModels.length : 0
       const promptCount = Array.isArray(data.promptModels) ? data.promptModels.length : 0
-      setNotice(`连接成功：图像模型 ${imageCount} 个，提示词模型 ${promptCount} 个`)
+      setNotice(t('messages.testSuccess', { imageCount, promptCount }))
       setError('')
       addDebugLog('connection_test_success', { imageCount, promptCount })
       await loadModels({ silent: true })
     } catch (err) {
-      setError(`连接失败：${friendlyMessageFromUnknown(err, '请检查网络或 API 配置')}`)
+      setError(`Connection failed: ${friendlyMessageFromUnknown(err, t('messages.networkError'))}`)
       addDebugLog('connection_test_failed', { reason: 'network_or_unknown' })
     } finally {
       setConnectionTesting(false)
@@ -569,14 +571,14 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const trimmedUrl = apiUrl.trim()
 
     if (!trimmedKey || !trimmedUrl) {
-      setError('请填写 API Key 和 API URL')
+      setError(t('messages.fillKeyAndUrl'))
       return
     }
 
     try {
       new URL(trimmedUrl)
     } catch {
-      setError('API URL 无效')
+      setError(t('messages.invalidUrl'))
       return
     }
 
@@ -586,7 +588,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     localStorage.setItem(HISTORY_LIMIT_KEY, String(historyLimit))
 
     setError('')
-    setNotice('设置已保存')
+    setNotice(t('messages.settingsSaved'))
     setSettingsOpen(false)
     loadModels({ silent: true })
   }
@@ -597,9 +599,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       const response = await fetch(generatedImage)
       const blob = await response.blob()
       await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })])
-      setNotice('已复制')
+      setNotice(t('messages.copied'))
     } catch {
-      setError('复制失败')
+      setError(t('messages.copyFailed'))
     }
   }
 
@@ -640,13 +642,13 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const remaining = max - current
 
     if (remaining <= 0) {
-      setError(`上限 ${max} 张`)
+      setError(t('messages.maxImagesReached', { max }))
       return
     }
 
     const imageFiles = files.filter((file) => file.type.startsWith('image/')).slice(0, remaining)
     if (imageFiles.length === 0) {
-      setError('请选择图片')
+      setError(t('messages.selectImage'))
       return
     }
 
@@ -658,7 +660,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       setEditImages((prev) => [...prev, ...parsed])
     }
 
-    setNotice(`已添加 ${parsed.length} 张`)
+    setNotice(t('messages.imagesAdded', { count: parsed.length }))
     setError('')
   }
   addImagesRef.current = addImages
@@ -695,7 +697,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     return new Promise<{ image?: string; text?: string }>((resolve, reject) => {
       const poll = async (): Promise<void> => {
         if (attempts >= maxAttempts) {
-          reject(new Error('任务超时，请稍后重试'))
+          reject(new Error(t('messages.taskTimeout')))
           return
         }
         attempts++
@@ -705,7 +707,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           const data = await response.json()
 
           if (!response.ok) {
-            throw new Error(data.error || '查询失败')
+            throw new Error(data.error || t('messages.queryFailed'))
           }
 
           const { task } = data
@@ -726,7 +728,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           }
 
           if (task.status === 'failed') {
-            throw new Error(friendlyMessageFromUnknown(task.error, '任务处理失败，请稍后重试'))
+            throw new Error(friendlyMessageFromUnknown(task.error, t('messages.taskFailed')))
           }
 
           if (task.status === 'pending' || task.status === 'processing') {
@@ -736,7 +738,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           }
         } catch (err) {
           addDebugLog('task_status_failed', { taskId, reason: err instanceof Error ? err.message : 'unknown' })
-          reject(err instanceof Error ? err : new Error('查询任务状态失败，请稍后重试'))
+          reject(err instanceof Error ? err : new Error(t('messages.queryFailed')))
         }
       }
 
@@ -746,11 +748,11 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
   const handleOptimizePrompt = async () => {
     if (!prompt.trim()) {
-      setError('请输入提示词')
+      setError(t('messages.fillPrompt'))
       return
     }
     if (!optimizeModel) {
-      setError('无可用优化模型')
+      setError(t('messages.noOptimizeModel'))
       return
     }
 
@@ -762,20 +764,20 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
       const headers = buildApiHeaders(true)
       if (!headers) {
-        setError('请配置 API')
+        setError(t('messages.fillApi'))
         return
       }
 
       const response = await fetch('/api/optimize-prompt', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ prompt, model: optimizeModel }),
+        body: JSON.stringify({ prompt, model: optimizeModel, locale }),
       })
 
       const data = (await response.json()) as ApiErrorLike & { optimizedPrompt?: string }
       if (!response.ok) {
         addDebugLog('optimize_failed', { status: response.status, code: data?.code, error: data?.error })
-        throw new Error(friendlyMessageFromResponse(response.status, data, '提示词优化失败，请稍后重试'))
+        throw new Error(friendlyMessageFromResponse(response.status, data, t('messages.optimizeFailed')))
       }
 
       if (data.optimizedPrompt) {
@@ -784,7 +786,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       }
     } catch (err) {
       addDebugLog('optimize_failed', { reason: err instanceof Error ? err.message : 'unknown' })
-      setError(friendlyMessageFromUnknown(err, '提示词优化失败，请稍后重试'))
+      setError(friendlyMessageFromUnknown(err, t('messages.optimizeFailed')))
     } finally {
       setOptimizing(false)
     }
@@ -792,16 +794,16 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      setError('请输入提示词')
+      setError(t('messages.fillPrompt'))
       return
     }
     if (!generateModel) {
-      setError('无可用模型')
+      setError(t('messages.noModel'))
       return
     }
 
     setLoading(true)
-    setLoadingMessage('排队中...')
+    setLoadingMessage(t('messages.queued'))
     setGeneratedImage(null)
     setGeneratedText('')
     setBatchResults([])
@@ -811,7 +813,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     try {
       const headers = buildApiHeaders(true)
       if (!headers) {
-        setError('请配置 API')
+        setError(t('messages.fillApi'))
         setLoading(false)
         return
       }
@@ -861,10 +863,10 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         addDebugLog('generate_submit', { model: generateModel, status: response.status, code: data?.code, index: i + 1 })
 
         if (!response.ok) {
-          throw new Error(friendlyMessageFromResponse(response.status, data, '创建任务失败，请稍后重试'))
+          throw new Error(friendlyMessageFromResponse(response.status, data, t('messages.generateFailed')))
         }
         if (!data.taskId) {
-          throw new Error('无任务ID')
+          throw new Error('No task ID')
         }
         taskIds.push(data.taskId)
       }
@@ -874,7 +876,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         taskIds.map(async (taskId) => {
           const result = await pollTaskStatus(taskId)
           completedCount += 1
-          setLoadingMessage(`生成中 (${completedCount}/${taskIds.length})...`)
+          setLoadingMessage(t('messages.generatingProgress', { completed: completedCount, total: taskIds.length }))
           return result
         })
       )
@@ -884,7 +886,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         .filter((item): item is string => typeof item === 'string' && item.length > 0)
 
       if (images.length === 0) {
-        throw new Error('未返回可用图片')
+        throw new Error(t('messages.noImageReturned'))
       }
 
       setGeneratedImage(images[0])
@@ -905,12 +907,12 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
       setNotice(
         autoSaveToHistory
-          ? `已生成 ${images.length} 张图片，并保存到历史`
-          : `已生成 ${images.length} 张图片（未自动保存）`
+          ? t('messages.savedToHistory', { count: images.length })
+          : t('messages.generatedNotSaved', { count: images.length })
       )
     } catch (err) {
       addDebugLog('generate_failed', { reason: err instanceof Error ? err.message : 'unknown' })
-      setError(friendlyMessageFromUnknown(err, '生成失败，请稍后重试'))
+      setError(friendlyMessageFromUnknown(err, t('messages.generateFailed')))
     } finally {
       setLoading(false)
     }
@@ -918,20 +920,20 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
   const handleEdit = async () => {
     if (!prompt.trim()) {
-      setError('请输入要求')
+      setError(t('messages.fillInstruction'))
       return
     }
     if (!editModel) {
-      setError('无可用模型')
+      setError(t('messages.noEditModel'))
       return
     }
     if (editImages.length === 0) {
-      setError('请上传图片')
+      setError(t('messages.uploadImage'))
       return
     }
 
     setLoading(true)
-    setLoadingMessage('排队中...')
+    setLoadingMessage(t('messages.queued'))
     setGeneratedImage(null)
     setGeneratedText('')
     setBatchResults([])
@@ -941,7 +943,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     try {
       const headers = buildApiHeaders(true)
       if (!headers) {
-        setError('请配置 API')
+        setError(t('messages.fillApi'))
         setLoading(false)
         return
       }
@@ -975,7 +977,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       addDebugLog('edit_submit', { model: editModel, status: response.status, code: data?.code })
 
       if (!response.ok) {
-        throw new Error(friendlyMessageFromResponse(response.status, data, '图片修改失败，请稍后重试'))
+        throw new Error(friendlyMessageFromResponse(response.status, data, t('messages.editFailed')))
       }
 
       if (data.image) {
@@ -996,7 +998,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       })
     } catch (err) {
       addDebugLog('edit_failed', { reason: err instanceof Error ? err.message : 'unknown' })
-      setError(friendlyMessageFromUnknown(err, '图片修改失败，请稍后重试'))
+      setError(friendlyMessageFromUnknown(err, t('messages.editFailed')))
     } finally {
       setLoading(false)
     }
@@ -1024,7 +1026,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     localStorage.removeItem(GENERATE_COUNT_KEY)
 
     setError('')
-    setNotice('创作参数已清空并恢复默认值')
+    setNotice(t('messages.clearedAndReset'))
   }
 
   useEffect(() => {
@@ -1154,9 +1156,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const generateModelIdSet = new Set(generateModels.map((item) => item.id))
     if (!generateModelIdSet.has(generateModel)) {
       setGenerateModel(generateModels[0].id)
-      if (generateModel) setNotice('模型已自动切换')
+      if (generateModel) setNotice(t('messages.modelAutoSwitched'))
     }
-  }, [generateModels, generateModel])
+  }, [generateModels, generateModel, t])
 
   useEffect(() => {
     if (editModels.length === 0) {
@@ -1165,9 +1167,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     const editModelIdSet = new Set(editModels.map((item) => item.id))
     if (!editModelIdSet.has(editModel)) {
       setEditModel(editModels[0].id)
-      if (editModel) setNotice('模型已自动切换')
+      if (editModel) setNotice(t('messages.modelAutoSwitched'))
     }
-  }, [editModels, editModel])
+  }, [editModels, editModel, t])
 
   useEffect(() => {
     if (promptModels.length === 0) {
@@ -1175,23 +1177,23 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
     }
     if (!promptModels.includes(optimizeModel)) {
       setOptimizeModel(promptModels[0])
-      if (optimizeModel) setNotice('模型已自动切换')
+      if (optimizeModel) setNotice(t('messages.modelAutoSwitched'))
     }
-  }, [promptModels, optimizeModel])
+  }, [promptModels, optimizeModel, t])
 
   useEffect(() => {
     if (!selectedGenerateCapabilities.supportsSearchGrounding && useGoogleSearch) {
       setUseGoogleSearch(false)
-      setNotice('当前模型不支持搜索')
+      setNotice(t('messages.currentModelNoSearch'))
     }
-  }, [selectedGenerateCapabilities.supportsSearchGrounding, useGoogleSearch])
+  }, [selectedGenerateCapabilities.supportsSearchGrounding, useGoogleSearch, t])
 
   useEffect(() => {
     if (!selectedGenerateCapabilities.supportsImageSearchGrounding && useGoogleImageSearch) {
       setUseGoogleImageSearch(false)
-      setNotice('当前模型不支持图片搜索')
+      setNotice(t('messages.imageSearchNotSupported'))
     }
-  }, [selectedGenerateCapabilities.supportsImageSearchGrounding, useGoogleImageSearch])
+  }, [selectedGenerateCapabilities.supportsImageSearchGrounding, useGoogleImageSearch, t])
 
   useEffect(() => {
     if (!selectedGenerateCapabilities.supportsThinkingConfig && thinkingLevel !== 'minimal') {
@@ -1284,11 +1286,11 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       try {
         await idbSet(HISTORY_KEY, historyItems.slice(0, historyLimit))
       } catch {
-        setError('浏览器存储不可用，无法保存历史记录')
+        setError(t('messages.browserStorageUnavailable'))
       }
     }
     void persistHistory()
-  }, [mounted, prefsHydrated, historyItems, historyLimit])
+  }, [mounted, prefsHydrated, historyItems, historyLimit, t])
 
   useEffect(() => {
     if (!mounted || !prefsHydrated) return
@@ -1296,11 +1298,11 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       try {
         await idbSet(TRASH_KEY, trashItems)
       } catch {
-        setError('浏览器存储不可用，无法保存回收站')
+        setError(t('messages.trashStorageUnavailable'))
       }
     }
     void persistTrash()
-  }, [mounted, prefsHydrated, trashItems])
+  }, [mounted, prefsHydrated, trashItems, t])
 
   useEffect(() => {
     setHistoryItems((prev) => prev.slice(0, historyLimit))
@@ -1332,9 +1334,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
   // --- UI Components ---
 
   const sidebarLinks = [
-    { key: 'studio', label: '创作', href: '/', icon: <Sparkles className='h-4 w-4' /> },
-    { key: 'history', label: '历史', href: '/history', icon: <History className='h-4 w-4' />, count: historyItems.length },
-    { key: 'trash', label: '回收', href: '/trash', icon: <Trash2 className='h-4 w-4' />, count: trashItems.length },
+    { key: 'studio', label: t('nav.create'), href: '/', icon: <Sparkles className='h-4 w-4' /> },
+    { key: 'history', label: t('nav.history'), href: '/history', icon: <History className='h-4 w-4' />, count: historyItems.length },
+    { key: 'trash', label: t('nav.trash'), href: '/trash', icon: <Trash2 className='h-4 w-4' />, count: trashItems.length },
   ]
 
   return (
@@ -1399,7 +1401,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
             }}
           >
             <Settings className='mr-2 h-4 w-4' />
-            设置
+            {t('actions.settings')}
           </Button>
           <Button
             variant='ghost'
@@ -1412,7 +1414,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
             disabled={modelsLoading}
           >
             <RefreshCw className={cn('mr-2 h-3 w-3', modelsLoading && 'animate-spin')} />
-            刷新模型
+            {t('actions.refreshModels')}
           </Button>
         </div>
       </aside>
@@ -1451,7 +1453,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                     mode === 'generate' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-900'
                   )}
                 >
-                  生成
+                  {t('modes.generate')}
                 </button>
                 <button
                   onClick={() => setMode('edit')}
@@ -1460,7 +1462,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                     mode === 'edit' ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-900'
                   )}
                 >
-                  编辑
+                  {t('modes.edit')}
                 </button>
               </div>
 
@@ -1468,32 +1470,32 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
               <div className='space-y-3'>
                 <div className='flex justify-between items-center'>
                   <Label className='text-xs font-semibold uppercase text-slate-400 tracking-wider'>
-                    {mode === 'generate' ? '提示词' : '编辑指令'}
+                    {mode === 'generate' ? t('labels.prompt') : t('labels.editInstruction')}
                   </Label>
                   <button 
                     onClick={handleOptimizePrompt}
                     disabled={optimizing || !prompt.trim()}
                     className='text-xs text-slate-400 hover:text-slate-900 flex items-center gap-1 transition-colors disabled:opacity-50'
-                    title='使用 AI 优化提示词'
+                    title={t('hints.promptOptimizer')}
                   >
                     <span className='text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-400 mr-1 hidden lg:inline-block'>⌘+Enter</span>
                     <Wand2 className='h-3 w-3' />
-                    优化
+                    {t('actions.optimize')}
                   </button>
                 </div>
                 <Textarea
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
-                  placeholder={mode === 'generate' ? '在此描述画面...' : '在此描述修改...'}
+                  placeholder={mode === 'generate' ? t('placeholders.promptGenerate') : t('placeholders.promptEdit')}
                   className='min-h-[140px] resize-none border-slate-200 focus:border-slate-400 focus:ring-4 focus:ring-slate-100 bg-white rounded-sm text-sm transition-all duration-300'
                 />
               </div>
 
               {/* Reference Images */}
               <div className='space-y-3'>
-                 <Label className='text-xs font-semibold uppercase text-slate-400 tracking-wider'>
-                    {mode === 'generate' ? '参考图' : '编辑素材'}
-                  </Label>
+<Label className='text-xs font-semibold uppercase text-slate-400 tracking-wider'>
+                     {mode === 'generate' ? t('labels.referenceImages') : t('labels.editMaterials')}
+                   </Label>
                 <div className='grid grid-cols-4 gap-2'>
                   {(mode === 'generate' ? referenceImages : editImages).map((img) => (
                     <div key={img.id} className='relative aspect-square bg-white rounded-sm overflow-hidden group border border-slate-200 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5'>
@@ -1554,12 +1556,12 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
               {/* Controls Grid */}
               <div className='grid grid-cols-3 gap-4'>
                 <div className='space-y-1.5'>
-                  <Label className='text-xs text-slate-500'>模型</Label>
+                  <Label className='text-xs text-slate-500'>{t('labels.model')}</Label>
                   <Select 
                     value={mode === 'generate' ? generateModel : editModel} 
                     onValueChange={mode === 'generate' ? setGenerateModel : setEditModel}
                   >
-                    <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='请选择' /></SelectTrigger>
+                    <SelectTrigger className='h-9 text-xs'><SelectValue placeholder={t('placeholders.selectModel')} /></SelectTrigger>
                     <SelectContent>
                       {(mode === 'generate' ? generateModels : editModels).map((m) => (
                         <SelectItem key={m.id} value={m.id} className='text-xs'>{m.id}</SelectItem>
@@ -1569,13 +1571,13 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 </div>
                 
                 <div className='space-y-1.5'>
-                  <Label className='text-xs text-slate-500'>比例</Label>
+                  <Label className='text-xs text-slate-500'>{t('labels.ratio')}</Label>
                   <Select
                     value={aspectRatio}
                     onValueChange={setAspectRatio}
                     disabled={!activeCapabilities.supportsAspectRatio}
                   >
-                    <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='自动' /></SelectTrigger>
+                    <SelectTrigger className='h-9 text-xs'><SelectValue placeholder={t('placeholders.auto')} /></SelectTrigger>
                     <SelectContent>
                       {availableAspectRatios.map((r) => <SelectItem key={r} value={r} className='text-xs'>{r}</SelectItem>)}
                     </SelectContent>
@@ -1583,7 +1585,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 </div>
 
                 <div className='space-y-1.5'>
-                  <Label className='text-xs text-slate-500'>分辨率</Label>
+                  <Label className='text-xs text-slate-500'>{t('labels.resolution')}</Label>
                   <Select
                     value={imageSize}
                     onValueChange={setImageSize}
@@ -1613,9 +1615,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                     selectedGenerateCapabilities.supportsSearchGrounding ? 'hover:shadow-md hover:border-slate-300' : 'opacity-60 cursor-not-allowed bg-slate-50'
                   )}>
                     <div className='space-y-0.5'>
-                      <Label htmlFor='google-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>使用 Google 搜索</Label>
+                      <Label htmlFor='google-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>{t('labels.googleSearch')}</Label>
                       <p className='text-xs text-slate-500'>
-                        {selectedGenerateCapabilities.supportsSearchGrounding ? '基于实时信息生成图片' : '当前模型不支持此功能'}
+                        {selectedGenerateCapabilities.supportsSearchGrounding ? t('hints.imageSearchHint') : t('hints.searchNotSupported')}
                       </p>
                     </div>
                     <Switch
@@ -1633,9 +1635,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                       : 'opacity-60 cursor-not-allowed bg-slate-50'
                   )}>
                     <div className='space-y-0.5'>
-                      <Label htmlFor='google-image-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsImageSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>使用 Google 图片搜索</Label>
+                      <Label htmlFor='google-image-search' className={cn('text-sm font-medium text-slate-900', selectedGenerateCapabilities.supportsImageSearchGrounding ? 'cursor-pointer' : 'cursor-not-allowed')}>{t('labels.googleImageSearch')}</Label>
                       <p className='text-xs text-slate-500'>
-                        {selectedGenerateCapabilities.supportsImageSearchGrounding ? '引入图片搜索视觉上下文（3.1 Flash）' : '当前模型不支持图片搜索'}
+                        {selectedGenerateCapabilities.supportsImageSearchGrounding ? t('hints.imageSearchHint') : t('hints.imageSearchNotSupported')}
                       </p>
                     </div>
                     <Switch
@@ -1651,15 +1653,15 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                     selectedGenerateCapabilities.supportsThinkingConfig ? 'hover:shadow-md hover:border-slate-300' : 'opacity-60 cursor-not-allowed bg-slate-50'
                   )}>
                     <div className='space-y-1.5'>
-                      <Label className='text-sm font-medium text-slate-900'>思考等级</Label>
+                      <Label className='text-sm font-medium text-slate-900'>{t('labels.thinkingLevel')}</Label>
                       <p className='text-xs text-slate-500'>
-                        {selectedGenerateCapabilities.supportsThinkingConfig ? '更高思考质量更稳，但延迟更高' : '当前模型不支持思考等级配置'}
+                        {selectedGenerateCapabilities.supportsThinkingConfig ? t('hints.thinkingLevelHint') : t('hints.thinkingNotSupported')}
                       </p>
                       <Select value={thinkingLevel} onValueChange={(value) => setThinkingLevel(value as 'minimal' | 'high')} disabled={!selectedGenerateCapabilities.supportsThinkingConfig}>
-                        <SelectTrigger className='h-9 text-xs'><SelectValue placeholder='低' /></SelectTrigger>
+                        <SelectTrigger className='h-9 text-xs'><SelectValue placeholder={t('placeholders.auto')} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value='minimal' className='text-xs'>低</SelectItem>
-                          <SelectItem value='high' className='text-xs'>高</SelectItem>
+                          <SelectItem value='minimal' className='text-xs'>{t('placeholders.auto')}</SelectItem>
+                          <SelectItem value='high' className='text-xs'>High</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1671,8 +1673,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 {mode === 'generate' && (
                   <div className='grid grid-cols-[1fr_120px] gap-3 items-center'>
                     <div>
-                      <Label htmlFor='generate-count' className='text-sm font-medium text-slate-900'>生成次数</Label>
-                      <p className='text-xs text-slate-500'>同一提示词并行生成多张图片（1-8）</p>
+                      <Label htmlFor='generate-count' className='text-sm font-medium text-slate-900'>{t('labels.generateCount')}</Label>
+                      <p className='text-xs text-slate-500'>{t('hints.generateCountHint')}</p>
                     </div>
                     <Input
                       id='generate-count'
@@ -1696,7 +1698,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                   className='w-full'
                   onClick={handleClearCreativeParams}
                 >
-                  清空创作参数
+                  {t('actions.clear')}
                 </Button>
               </div>
 
@@ -1707,7 +1709,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 disabled={loading}
               >
                 {loading ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Sparkles className='mr-2 h-4 w-4' />}
-                {loading ? '处理中' : '立即生成'}
+                {loading ? t('messages.processing') : t('actions.generate')}
               </Button>
 
             </div>
@@ -1755,7 +1757,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 ) : (
                   <div className='text-center text-slate-300 flex flex-col items-center justify-center'>
                     <ImageIcon className='h-24 w-24 mb-4 opacity-10' />
-                    <p className='text-base font-medium opacity-50'>暂无内容</p>
+                    <p className='text-base font-medium opacity-50'>{t('messages.noContent')}</p>
                   </div>
                 )}
               </div>
@@ -1768,7 +1770,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
               {mode === 'generate' && batchResults.length > 1 && (
                 <div className='mt-4'>
-                  <p className='mb-2 text-xs font-medium text-slate-500'>本次生成结果（{batchResults.length}）</p>
+                  <p className='mb-2 text-xs font-medium text-slate-500'>{t('messages.generatedNotSaved', { count: batchResults.length })}</p>
                   <div className='grid grid-cols-4 gap-2'>
                     {batchResults.map((image, index) => (
                       <button
@@ -1794,8 +1796,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         {workspacePage === 'history' && (
            <div className='max-w-[1600px] mx-auto'>
             <div className='flex items-center justify-between mb-6'>
-              <h2 className='text-xl font-bold'>历史记录</h2>
-              <span className='text-sm text-slate-400'>{historyItems.length} items</span>
+              <h2 className='text-xl font-bold'>{t('nav.history')}</h2>
+              <span className='text-sm text-slate-400'>{t('messages.historyCount', { count: historyItems.length })}</span>
             </div>
             
             <div className='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4'>
@@ -1822,10 +1824,10 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                       <button 
                         onClick={() => {
                           navigator.clipboard.writeText(item.prompt)
-                          setNotice('提示词已复制')
+                          setNotice(t('messages.promptCopied'))
                         }}
                         className='text-[10px] text-slate-400 hover:text-slate-900 opacity-0 group-hover:opacity-100 transition-opacity'
-                        title='复制提示词'
+                        title={t('messages.promptCopied')}
                       >
                         <Copy className='h-3 w-3' />
                       </button>
@@ -1839,8 +1841,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                   <div className='h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4'>
                     <History className='h-8 w-8 opacity-20' />
                   </div>
-                  <p className='text-sm font-medium'>暂无历史记录</p>
-                  <p className='text-xs mt-1 opacity-60'>生成的图片会自动保存在这里</p>
+                  <p className='text-sm font-medium'>{t('messages.noHistory')}</p>
+                  <p className='text-xs mt-1 opacity-60'>{t('messages.noHistoryHint')}</p>
                 </div>
               )}
             </div>
@@ -1850,8 +1852,12 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         {workspacePage === 'trash' && (
            <div className='max-w-[1600px] mx-auto'>
             <div className='flex items-center justify-between mb-6'>
-              <h2 className='text-xl font-bold'>回收站</h2>
-              <Button variant='outline' size='sm' onClick={clearTrash} disabled={trashItems.length === 0}>清空</Button>
+              <h2 className='text-xl font-bold'>{t('nav.trash')}</h2>
+              <Button variant='outline' size='sm' onClick={() => {
+                if (window.confirm(t('messages.confirmClearTrash'))) {
+                  clearTrash()
+                }
+              }} disabled={trashItems.length === 0}>{t('actions.clear')}</Button>
             </div>
             
             <div className='grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4'>
@@ -1875,8 +1881,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                   <div className='h-16 w-16 rounded-full bg-slate-50 flex items-center justify-center mb-4'>
                     <Trash2 className='h-8 w-8 opacity-20' />
                   </div>
-                  <p className='text-sm font-medium'>回收站为空</p>
-                  <p className='text-xs mt-1 opacity-60'>删除的图片会暂时存放在这里</p>
+                  <p className='text-sm font-medium'>{t('messages.trashEmpty')}</p>
+                  <p className='text-xs mt-1 opacity-60'>{t('messages.trashHint')}</p>
                 </div>
               )}
             </div>
@@ -1890,36 +1896,51 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           <Card className='w-full max-w-md bg-white border-none shadow-xl rounded-sm' onClick={e => e.stopPropagation()}>
             <div className='p-6 space-y-6'>
               <div className='flex items-center justify-between'>
-                <h3 className='text-lg font-bold'>设置</h3>
+                <h3 className='text-lg font-bold'>{t('settings.title')}</h3>
                 <button onClick={() => setSettingsOpen(false)} className='text-slate-400 hover:text-slate-900'><X className='h-5 w-5' /></button>
               </div>
               
               <div className='space-y-4'>
                 <div className='space-y-2'>
-                  <Label>API Key</Label>
-                  <Input type='password' value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder='Gemini API Key' />
+                  <Label>{t('settings.apiKey')}</Label>
+                  <Input type='password' value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={t('placeholders.apiKeyPlaceholder')} />
                 </div>
                 <div className='space-y-2'>
-                  <Label>API URL</Label>
-                  <Input value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder='https://generativelanguage.googleapis.com' />
+                  <Label>{t('settings.apiUrl')}</Label>
+                  <Input value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder={t('placeholders.apiUrlPlaceholder')} />
                 </div>
                 <div className='space-y-2'>
-                   <Label>提示词优化模型</Label>
+                   <Label>{t('settings.promptOptimizerModel')}</Label>
                    <Select value={optimizeModel} onValueChange={setOptimizeModel}>
-                    <SelectTrigger><SelectValue placeholder='请选择模型' /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('settings.selectModel')} /></SelectTrigger>
                     <SelectContent>
                       {promptModels.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
                     </SelectContent>
                    </Select>
                 </div>
+                <div className='space-y-2'>
+                  <Label>{t('settings.language')}</Label>
+                  <Select value={locale} onValueChange={(v) => setLocale(v as Locale)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='zh-CN'>中文</SelectItem>
+                      <SelectItem value='en'>English</SelectItem>
+                      <SelectItem value='ja'>日本語</SelectItem>
+                      <SelectItem value='ko'>한국어</SelectItem>
+                      <SelectItem value='fr'>Français</SelectItem>
+                      <SelectItem value='de'>Deutsch</SelectItem>
+                      <SelectItem value='es'>Español</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className='flex items-center justify-between pt-2'>
-                  <Label>调试模式</Label>
+                  <Label>{t('settings.debugMode')}</Label>
                   <Switch checked={debugEnabled} onCheckedChange={setDebugEnabled} />
                 </div>
                 <div className='flex items-center justify-between pt-2'>
                   <div>
-                    <Label>自动保存到历史</Label>
-                    <p className='text-xs text-slate-500 mt-1'>生成完成后自动写入历史记录</p>
+                    <Label>{t('settings.autoSaveToHistory')}</Label>
+                    <p className='text-xs text-slate-500 mt-1'>{t('hints.autoSaveHint')}</p>
                   </div>
                   <Switch checked={autoSaveToHistory} onCheckedChange={setAutoSaveToHistory} />
                 </div>
@@ -1927,9 +1948,9 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
               <div className='flex gap-3 pt-2'>
                 <Button variant='outline' className='flex-1' onClick={handleTestConnection} disabled={connectionTesting}>
-                  {connectionTesting ? '测试中...' : '测试连接'}
+                  {connectionTesting ? t('actions.testing') : t('actions.test')}
                 </Button>
-                <Button className='flex-1 bg-slate-900 text-white hover:bg-black' onClick={handleSaveSettings}>保存</Button>
+                <Button className='flex-1 bg-slate-900 text-white hover:bg-black' onClick={handleSaveSettings}>{t('actions.save')}</Button>
               </div>
             </div>
           </Card>

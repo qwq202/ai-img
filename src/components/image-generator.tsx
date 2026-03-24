@@ -1896,7 +1896,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           <Card className='w-full max-w-md bg-white border-none shadow-xl rounded-sm' onClick={e => e.stopPropagation()}>
             <div className='p-6 space-y-6'>
               <div className='flex items-center justify-between'>
-                <h3 className='text-lg font-bold'>{t('settings.title')}</h3>
+                <h3 className='text-lg font-bold'>{t('settings.title')} <span className='text-xs font-normal text-slate-400'>v1.1.0</span></h3>
                 <button onClick={() => setSettingsOpen(false)} className='text-slate-400 hover:text-slate-900'><X className='h-5 w-5' /></button>
               </div>
               
@@ -1952,7 +1952,6 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 </Button>
                 <Button className='flex-1 bg-slate-900 text-white hover:bg-black' onClick={handleSaveSettings}>{t('actions.save')}</Button>
               </div>
-              <p className='text-center text-xs text-slate-400 pt-4'>v1.1.0</p>
             </div>
           </Card>
         </div>

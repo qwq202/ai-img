@@ -5,6 +5,9 @@ import { I18nProvider } from "@/lib/i18n";
 export const metadata: Metadata = {
   title: "AI Image Generator",
   description: "AI image generation tool based on Google Gemini API",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

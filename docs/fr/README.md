@@ -23,6 +23,9 @@ L'IA optimise automatiquement vos prompts pour des résultats de génération pl
 ### Amélioration de recherche en temps réel
 Connectez-vous à Google Search pour obtenir des informations en temps réel pour assister la génération d'images.
 
+### Support multilingue
+Support de 7 langues: English, 简体中文, 日本語, 한국어, **Français**, Deutsch, Español. La langue peut être changée dans les paramètres, et l'optimisation des prompts produira dans la langue correspondante.
+
 ## Aperçu de l'interface
 
 **Accueil** - Entrez des descriptions, ajustez les paramètres, téléchargez des images de référence et générez des images AI en un clic.

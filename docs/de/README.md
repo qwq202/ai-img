@@ -23,6 +23,9 @@ KI optimiert Ihre Prompts automatisch für genauere Generierungsergebnisse.
 ### Echtzeit-Suche-Verbesserung
 Verbindung zu Google Search für Echtzeit-Informationen zur Unterstützung der Bildgenerierung.
 
+### Mehrsprachige Unterstützung
+Unterstützung von 7 Sprachen: English, 简体中文, 日本語, 한국어, Français, **Deutsch**, Español. Sprache kann in den Einstellungen gewechselt werden, und die Prompt-Optimierung gibt in der entsprechenden Sprache aus.
+
 ## Schnittstellen-Vorschau
 
 **Startseite** - Beschreibungen eingeben, Parameter anpassen, Referenzbilder hochladen und mit einem Klick KI-Bilder generieren.

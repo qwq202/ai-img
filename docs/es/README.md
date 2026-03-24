@@ -23,6 +23,9 @@ La IA optimiza automáticamente sus prompts para resultados de generación más 
 ### Mejora de búsqueda en tiempo real
 Conéctese a Google Search para obtener información en tiempo real para asistir la generación de imágenes.
 
+### Soporte multilingüe
+Soporte de 7 idiomas: English, 简体中文, 日本語, 한국어, Français, Deutsch, **Español**. El idioma se puede cambiar en la configuración, y la optimización de prompts se mostrará en el idioma correspondiente.
+
 ## Vista previa de la interfaz
 
 **Inicio** - Ingrese descripciones, ajuste parámetros, cargue imágenes de referencia y genere imágenes IA con un clic.

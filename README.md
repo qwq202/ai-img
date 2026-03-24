@@ -1,97 +1,93 @@
-# AI 图像生成器
+# AI Image Generator
 
-基于 Google Gemini API 的 AI 图像生成应用，使用 Next.js 和 shadcn/ui 构建。
+一个优雅的 AI 图像生成工具，基于 Google Gemini API，支持文生图、图片编辑、智能提示词优化。
 
-## 功能特性
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![React](https://img.shields.io/badge/React-19-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-- 文本转图像生成（使用 gemini-3-pro-image-preview 模型）
-- 图片修改（模型列表与能力仅以 API 实时返回为准）
-- 智能提示词优化（可在设置中选择模型，默认 gemini-2.5-flash-lite）
-- 支持多种宽高比（1:1, 2:3, 3:2, 3:4, 4:3, 4:5, 5:4, 9:16, 16:9, 21:9）
-- 支持多种分辨率（1K, 2K, 4K）
-- 支持 Google 搜索实时信息生成
-- 参考图上传数量按模型能力自动限制
-- 图片预览和下载
-- 异步任务处理，避免超时
+## 核心功能
 
-## 配置
+### 文本转图像
+输入描述词，即可生成精美图像。支持多种风格和场景描述。
 
-在页面右上角的设置中填写 Gemini API Key 和 API URL（仅保存在当前浏览器）。
+### 智能提示词优化
+AI 自动优化你的描述词，获得更准确的生成结果。
 
-## 安装和运行
+### 灵活参数调节
+- **多种宽高比**：1:1、2:3、3:2、3:4、4:3、4:5、5:4、9:16、16:9、21:9
+- **多种分辨率**：1K、2K、4K
+- **支持参考图**：上传参考图引导生成方向
+
+### 实时搜索增强
+连接 Google 搜索，获取实时信息辅助图像生成。
+
+## 界面预览
+
+**首页** - 输入描述词、调节参数、上传参考图，一键生成 AI 图像。
+
+![首页](image/首页.png)
+
+**历史** - 自动保存所有生成记录，方便回顾和管理过往作品。
+
+![历史](image/历史.png)
+
+**设置** - 配置 API Key 和偏好设置，自定义生成体验。
+
+![设置](image/设置.png)
+
+## Vercel 部署
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/qunqin45/ai-img)
+
+点击上方按钮，一键免费部署到 Vercel。
+
+## Docker 部署
+
+专为 Linux x86_64 架构优化，一键部署：
 
 ```bash
+docker run -d --name ai-img --restart unless-stopped -p 3000:3000 qunqin45/ai-img:latest
+```
+
+部署后访问 `http://<你的服务器IP>:3000`。
+
+常用运维命令：
+```bash
+docker logs -f ai-img   # 查看日志
+docker restart ai-img   # 重启
+docker stop ai-img && docker rm ai-img  # 停止并删除
+```
+
+## 快速开始
+
+```bash
+# 克隆项目
+git clone https://github.com/qunqin45/ai-img.git
+cd ai-img
+
 # 安装依赖
 pnpm install
 
-# 开发模式运行
+# 启动开发服务器
 pnpm dev
-
-# 构建生产版本
-pnpm build
-
-# 运行生产版本
-pnpm start
 ```
 
-打开 [http://localhost:3000](http://localhost:3000) 访问应用。
+打开 [http://localhost:3000](http://localhost:3000) 开始使用。
 
-## Docker 部署（Linux）
+## 配置
 
-### 方式一：直接使用云端镜像（推荐）
+在页面右上角设置中填写：
+- **API Key**：你的 Gemini API 密钥
+- **API URL**：Gemini API 地址（可选）
 
-```bash
-# 拉取最新镜像
-docker pull qunqin45/ai-img:latest
+API 密钥仅保存在本地浏览器中。
 
-# 后台启动
-docker run -d \
-  --name ai-img \
-  --restart unless-stopped \
-  -p 3000:3000 \
-  qunqin45/ai-img:latest
-```
-
-- `--restart unless-stopped`：容器异常退出、Docker 重启或服务器重启后自动拉起；手动 `docker stop` 后保持停止。
-- 启动后访问：`http://<你的服务器IP>:3000`
-
-### 方式二：本地构建镜像再运行（可选）
-
-```bash
-# 构建 Linux 镜像（如部署到 x86_64 Linux 服务器）
-docker build --platform linux/amd64 -t ai-img:latest .
-
-# 运行容器
-docker run -d --name ai-img --restart unless-stopped -p 3000:3000 ai-img:latest
-```
-
-### 常用运维命令
-
-```bash
-docker ps
-docker logs -f ai-img
-docker restart ai-img
-docker stop ai-img && docker rm ai-img
-```
-
-启动后访问 [http://localhost:3000](http://localhost:3000)。
 ## 技术栈
 
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Lucide Icons
-
-## API 端点
-
-- `POST /api/generate` - 创建图像生成任务
-- `GET /api/task/[taskId]` - 查询任务状态
-- `POST /api/optimize-prompt` - 优化提示词
-- `POST /api/edit` - 修改图片
-- `GET /api/models` - 获取实时可用模型与能力（包含 `models`、`imageModels`、`promptModels`、`fetchedAt`）
+![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js) ![React](https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat-square&logo=typescript) ![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-4?style=flat-square&logo=tailwindcss) ![shadcn/ui](https://img.shields.io/badge/shadcn/ui-gray?style=flat-square)
 
 ## 许可证
 
-MIT
+[MIT License](LICENSE)

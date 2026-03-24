@@ -29,6 +29,11 @@
 - 建议：提交信息简短、祈使句式（例如 "Add prompt optimizer endpoint"）。
 - PR 建议包含：简要说明、涉及 UI 变更时的截图、以及必要的配置/使用说明。
 
+## Docker 部署指南
+- 打包命令：`docker build --platform linux/amd64 -t qunqin45/ai-img:latest .`
+- 推送命令：`docker push qunqin45/ai-img:latest`
+- 每次部署直接更新 latest 镜像，无需版本号。
+
 ## 配置与安全注意事项
 - Gemini API Key 与 API URL 通过右上角设置填写，仅保存在浏览器中。
 - 避免提交敏感信息；如需新增环境变量，请在 `README.md` 中说明并提供示例（如 `.env.example`）。

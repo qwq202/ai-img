@@ -1952,6 +1952,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
                 </Button>
                 <Button className='flex-1 bg-slate-900 text-white hover:bg-black' onClick={handleSaveSettings}>{t('actions.save')}</Button>
               </div>
+              <p className='text-center text-xs text-slate-400 pt-4'>v1.1.0</p>
             </div>
           </Card>
         </div>

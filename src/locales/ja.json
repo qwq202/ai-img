@@ -129,7 +129,9 @@
     "maxImagesReached": "上限 {max} 枚に達しました",
     "browserStorageUnavailable": "ブラウザストレージが利用できません",
     "trashStorageUnavailable": "ブラウザストレージが利用できません",
-    "currentModelNoSearch": "現在のモデルは検索をサポートしていません"
+    "currentModelNoSearch": "現在のモデルは検索をサポートしていません",
+    "updateAvailable": "新バージョン v{version} が利用可能です",
+    "viewUpdate": "アップデートを見る"
   },
   "settings": {
     "title": "設定",

@@ -129,7 +129,9 @@
     "maxImagesReached": "Limit {max} images",
     "browserStorageUnavailable": "Browser storage unavailable, cannot save history",
     "trashStorageUnavailable": "Browser storage unavailable, cannot save trash",
-    "currentModelNoSearch": "Current model does not support search"
+    "currentModelNoSearch": "Current model does not support search",
+    "updateAvailable": "New version v{version} available",
+    "viewUpdate": "View update"
   },
   "settings": {
     "title": "Settings",

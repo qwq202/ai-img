@@ -129,7 +129,9 @@
     "maxImagesReached": "Limit von {max} Bildern erreicht",
     "browserStorageUnavailable": "Browserspeicher nicht verfügbar",
     "trashStorageUnavailable": "Browserspeicher für Papierkorb nicht verfügbar",
-    "currentModelNoSearch": "Aktuelles Modell unterstützt keine Suche"
+    "currentModelNoSearch": "Aktuelles Modell unterstützt keine Suche",
+    "updateAvailable": "Neue Version v{version} verfügbar",
+    "viewUpdate": "Update ansehen"
   },
   "settings": {
     "title": "Einstellungen",

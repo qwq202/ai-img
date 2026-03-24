@@ -129,7 +129,9 @@
     "maxImagesReached": "상한 {max}장에 도달했습니다",
     "browserStorageUnavailable": "브라우저 저장소를 사용할 수 없습니다",
     "trashStorageUnavailable": "브라우저 저장소를 사용할 수 없습니다",
-    "currentModelNoSearch": "현재 모델은 검색을 지원하지 않습니다"
+    "currentModelNoSearch": "현재 모델은 검색을 지원하지 않습니다",
+    "updateAvailable": "새 버전 v{version} 사용 가능",
+    "viewUpdate": "업데이트 보기"
   },
   "settings": {
     "title": "설정",

@@ -189,6 +189,8 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
 
   const [debugEnabled, setDebugEnabled] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [latestVersion, setLatestVersion] = useState('')
 
   const [imageLoading, setImageLoading] = useState(true)
 
@@ -197,6 +199,26 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
       setImageLoading(true)
     }
   }, [generatedImage])
+
+  // Check for updates
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const response = await fetch('https://api.github.com/repos/qwq202/ai-img/releases/latest')
+        if (response.ok) {
+          const data = await response.json()
+          const latest = data.tag_name?.replace(/^v/, '') || ''
+          if (latest && latest !== '1.1.0') {
+            setLatestVersion(latest)
+            setUpdateAvailable(true)
+          }
+        }
+      } catch {
+        // Silently fail
+      }
+    }
+    checkForUpdates()
+  }, [])
 
   const revokePreviewUrl = (url?: string) => {
     if (url?.startsWith('blob:')) {
@@ -1434,6 +1456,28 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
             {error ? <AlertCircle className='h-5 w-5 text-red-500' /> : <CheckCircle2 className='h-5 w-5 text-green-500' />}
             <span className='text-sm font-medium'>{error || notice}</span>
             <button onClick={() => { setError(''); setNotice('') }} className='ml-2 opacity-70 hover:opacity-100'>
+              <X className='h-4 w-4' />
+            </button>
+          </div>
+        )}
+
+        {updateAvailable && (
+          <div className='fixed top-4 right-4 z-50 bg-blue-50 border border-blue-200 rounded-md p-3 shadow-lg flex items-center gap-3 max-w-sm'>
+            <Sparkles className='h-4 w-4 text-blue-500 flex-shrink-0' />
+            <div className='flex-1 min-w-0'>
+              <p className='text-sm text-blue-700'>
+                {t('messages.updateAvailable', { version: latestVersion })}
+              </p>
+            </div>
+            <a
+              href='https://github.com/qwq202/ai-img/releases'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-xs text-blue-600 hover:text-blue-800 underline flex-shrink-0'
+            >
+              {t('messages.viewUpdate')}
+            </a>
+            <button onClick={() => setUpdateAvailable(false)} className='text-blue-400 hover:text-blue-600 flex-shrink-0'>
               <X className='h-4 w-4' />
             </button>
           </div>

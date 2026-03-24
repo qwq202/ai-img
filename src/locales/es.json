@@ -129,7 +129,9 @@
     "maxImagesReached": "Límite de {max} imágenes alcanzado",
     "browserStorageUnavailable": "Almacenamiento del navegador no disponible",
     "trashStorageUnavailable": "Almacenamiento del navegador no disponible para la papelera",
-    "currentModelNoSearch": "El modelo actual no soporta búsqueda"
+    "currentModelNoSearch": "El modelo actual no soporta búsqueda",
+    "updateAvailable": "Nueva versión v{version} disponible",
+    "viewUpdate": "Ver actualización"
   },
   "settings": {
     "title": "Configuración",

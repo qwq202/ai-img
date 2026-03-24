@@ -129,7 +129,9 @@
     "maxImagesReached": "上限 {max} 张",
     "browserStorageUnavailable": "浏览器存储不可用，无法保存历史记录",
     "trashStorageUnavailable": "浏览器存储不可用，无法保存回收站",
-    "currentModelNoSearch": "当前模型不支持搜索"
+    "currentModelNoSearch": "当前模型不支持搜索",
+    "updateAvailable": "发现新版本 v{version}",
+    "viewUpdate": "查看更新"
   },
   "settings": {
     "title": "设置",

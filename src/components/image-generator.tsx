@@ -135,6 +135,7 @@ const ASPECT_RATIO_KEY = 'gemini_aspect_ratio'
 const GOOGLE_SEARCH_KEY = 'gemini_use_google_search'
 const GOOGLE_IMAGE_SEARCH_KEY = 'gemini_use_google_image_search'
 const THINKING_LEVEL_KEY = 'gemini_thinking_level'
+const CURRENT_VERSION = '1.1.0'
 
 export default function ImageGenerator({ initialPage = 'studio' }: ImageGeneratorProps) {
   const pathname = usePathname()
@@ -208,7 +209,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
         if (response.ok) {
           const data = await response.json()
           const latest = data.tag_name?.replace(/^v/, '') || ''
-          if (latest && latest !== '1.1.0') {
+          if (latest && latest !== CURRENT_VERSION) {
             setLatestVersion(latest)
             setUpdateAvailable(true)
           }
@@ -1940,7 +1941,7 @@ export default function ImageGenerator({ initialPage = 'studio' }: ImageGenerato
           <Card className='w-full max-w-md bg-white border-none shadow-xl rounded-sm' onClick={e => e.stopPropagation()}>
             <div className='p-6 space-y-6'>
               <div className='flex items-center justify-between'>
-                <h3 className='text-lg font-bold'>{t('settings.title')} <span className='text-xs font-normal text-slate-400'>v1.1.0</span></h3>
+                <h3 className='text-lg font-bold'>{t('settings.title')} <span className='text-xs font-normal text-slate-400'>v{CURRENT_VERSION}</span></h3>
                 <button onClick={() => setSettingsOpen(false)} className='text-slate-400 hover:text-slate-900'><X className='h-5 w-5' /></button>
               </div>
               

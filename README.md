@@ -45,7 +45,7 @@ AI 自动优化你的描述词，获得更准确的生成结果。
 
 ## Docker 部署
 
-专为 Linux x86_64 架构优化，一键部署：
+一键部署：
 
 ```bash
 docker run -d --name ai-img --restart unless-stopped -p 3000:3000 qunqin45/ai-img:latest

@@ -27,15 +27,15 @@ AI 自动优化你的描述词，获得更准确的生成结果。
 
 **首页** - 输入描述词、调节参数、上传参考图，一键生成 AI 图像。
 
-![首页](../image/首页.png)
+![首页](https://github.com/qwq202/ai-img/blob/main/image/首页.png)
 
 **历史** - 自动保存所有生成记录，方便回顾和管理过往作品。
 
-![历史](../image/历史.png)
+![历史](https://github.com/qwq202/ai-img/blob/main/image/历史.png)
 
 **设置** - 配置 API Key 和偏好设置，自定义生成体验。
 
-![设置](../image/设置.png)
+![设置](https://github.com/qwq202/ai-img/blob/main/image/设置.png)
 
 ## Vercel 部署
 

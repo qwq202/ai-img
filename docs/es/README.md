@@ -27,15 +27,15 @@ Conéctese a Google Search para obtener información en tiempo real para asistir
 
 **Inicio** - Ingrese descripciones, ajuste parámetros, cargue imágenes de referencia y genere imágenes IA con un clic.
 
-![Inicio](../image/首页.png)
+![Inicio](https://github.com/qwq202/ai-img/blob/main/image/首页.png)
 
 **Historial** - Guarda automáticamente todos los registros de generación para revisión y gestión fácil de trabajos anteriores.
 
-![Historial](../image/历史.png)
+![Historial](https://github.com/qwq202/ai-img/blob/main/image/历史.png)
 
 **Configuración** - Configure la clave API y preferencias para personalizar su experiencia de generación.
 
-![Configuración](../image/设置.png)
+![Configuración](https://github.com/qwq202/ai-img/blob/main/image/设置.png)
 
 ## Despliegue en Vercel
 

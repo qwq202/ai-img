@@ -27,15 +27,15 @@ Google 검색에 연결하여 실시간 정보로 이미지 생성 지원.
 
 **홈** - 설명 입력, 파라미터 조정, 참조 이미지 업로드, 원클릭 AI 이미지 생성.
 
-![홈](../image/首页.png)
+![홈](https://github.com/qwq202/ai-img/blob/main/image/首页.png)
 
 **기록** - 모든 생성 기록을 자동 저장하여 과거 작품 검토 및 관리 용이.
 
-![기록](../image/历史.png)
+![기록](https://github.com/qwq202/ai-img/blob/main/image/历史.png)
 
 **설정** - API Key 및 기본 설정 구성하여 맞춤형 생성 경험.
 
-![설정](../image/设置.png)
+![설정](https://github.com/qwq202/ai-img/blob/main/image/设置.png)
 
 ## Vercel 배포
 

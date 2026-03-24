@@ -27,15 +27,15 @@ Verbindung zu Google Search für Echtzeit-Informationen zur Unterstützung der B
 
 **Startseite** - Beschreibungen eingeben, Parameter anpassen, Referenzbilder hochladen und mit einem Klick KI-Bilder generieren.
 
-![Startseite](../image/首页.png)
+![Startseite](https://github.com/qwq202/ai-img/blob/main/image/首页.png)
 
 **Verlauf** - Alle Generierungsaufzeichnungen werden automatisch gespeichert für einfache Überprüfung und Verwaltung vergangener Werke.
 
-![Verlauf](../image/历史.png)
+![Verlauf](https://github.com/qwq202/ai-img/blob/main/image/历史.png)
 
 **Einstellungen** - API-Schlüssel und Präferenzen konfigurieren, um Ihr Generierungserlebnis anzupassen.
 
-![Einstellungen](../image/设置.png)
+![Einstellungen](https://github.com/qwq202/ai-img/blob/main/image/设置.png)
 
 ## Vercel Deployment
 

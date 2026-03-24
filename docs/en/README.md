@@ -27,15 +27,15 @@ Connect to Google Search for real-time information to assist image generation.
 
 **Home** - Enter descriptions, adjust parameters, upload reference images, and generate AI images with one click.
 
-![Home](../image/首页.png)
+![Home](https://github.com/qwq202/ai-img/blob/main/image/首页.png)
 
 **History** - Automatically saves all generation records for easy review and management of past works.
 
-![History](../image/历史.png)
+![History](https://github.com/qwq202/ai-img/blob/main/image/历史.png)
 
 **Settings** - Configure API Key and preferences to customize your generation experience.
 
-![Settings](../image/设置.png)
+![Settings](https://github.com/qwq202/ai-img/blob/main/image/设置.png)
 
 ## Vercel Deployment
 
